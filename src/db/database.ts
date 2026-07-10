@@ -201,6 +201,38 @@ export function removeQuestion(guildId: string, position: number): boolean {
   return true;
 }
 
+export function reorderQuestion(
+  guildId: string,
+  fromPosition: number,
+  toPosition: number
+): boolean {
+  const existing = getQuestions(guildId);
+  if (
+    fromPosition < 0 ||
+    fromPosition >= existing.length ||
+    toPosition < 0 ||
+    toPosition >= existing.length
+  ) {
+    return false;
+  }
+  if (fromPosition === toPosition) return true;
+
+  const reordered = [...existing];
+  const [moved] = reordered.splice(fromPosition, 1);
+  reordered.splice(toPosition, 0, moved);
+
+  const tx = db.transaction(() => {
+    reordered.forEach((question, index) => {
+      db.prepare(`UPDATE questions SET position = ? WHERE id = ?`).run(
+        index,
+        question.id
+      );
+    });
+  });
+  tx();
+  return true;
+}
+
 export function createApplication(
   guildId: string,
   userId: string,

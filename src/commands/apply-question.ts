@@ -4,7 +4,12 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { MAX_QUESTIONS } from "../config";
-import { addQuestion, getQuestions, removeQuestion } from "../db/database";
+import {
+  addQuestion,
+  getQuestions,
+  removeQuestion,
+  reorderQuestion,
+} from "../db/database";
 import { Command } from "./types";
 
 export const applyQuestionCommand: Command = {
@@ -61,6 +66,25 @@ export const applyQuestionCommand: Command = {
     )
     .addSubcommand((sub) =>
       sub.setName("list").setDescription("List the current application questions.")
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("move")
+        .setDescription("Change the order questions are asked in.")
+        .addIntegerOption((opt) =>
+          opt
+            .setName("position")
+            .setDescription("Current position, as shown in /apply-question list")
+            .setRequired(true)
+            .setMinValue(1)
+        )
+        .addIntegerOption((opt) =>
+          opt
+            .setName("to")
+            .setDescription("New position for that question")
+            .setRequired(true)
+            .setMinValue(1)
+        )
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -127,6 +151,19 @@ export const applyQuestionCommand: Command = {
       );
       await interaction.reply({
         content: lines.join("\n"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (sub === "move") {
+      const from = interaction.options.getInteger("position", true) - 1;
+      const to = interaction.options.getInteger("to", true) - 1;
+      const moved = reorderQuestion(guildId, from, to);
+      await interaction.reply({
+        content: moved
+          ? "Question order updated. Check /apply-question list to confirm."
+          : "Invalid position(s). Check /apply-question list for valid positions.",
         ephemeral: true,
       });
     }

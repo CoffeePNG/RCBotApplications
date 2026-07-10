@@ -8,8 +8,8 @@ decision is archived to a log channel.
 
 - `/apply` — applicant-facing command that opens a modal with the server's
   configured questions (up to 5, a Discord modal limit).
-- `/apply-question add|remove|list` — staff manage the question set without
-  touching code.
+- `/apply-question add|remove|list|move` — staff manage the question set
+  (including reordering) without touching code.
 - `/apply-setup review-channel|log-channel|staff-role|view` — staff configure
   where applications are reviewed/archived and who can decide them.
 - `/applications <user>` — staff view a user's application history.
