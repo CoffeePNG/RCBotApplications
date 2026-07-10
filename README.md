@@ -57,3 +57,49 @@ Applicants can then run `/apply`.
 The bot only needs the `Guilds` gateway intent. In the server, it needs
 permission to send messages/embeds in the review and log channels, and to DM
 users (default, unless the applicant has DMs from server members disabled).
+
+## Deploying to a VPS (24/7)
+
+The SQLite file at `DATABASE_PATH` (default `data/applications.sqlite`) holds
+all state, so make sure it lives on a persistent volume/directory in whichever
+option you pick below.
+
+### Option A: Docker Compose (recommended)
+
+1. Copy the repo to the server and create `.env` there (same contents as
+   `.env.example`, filled in with your real token/IDs). Never commit `.env`.
+2. Run the one-time slash command registration from your machine or the
+   server (needs the same `.env`):
+   ```
+   npm install
+   npm run deploy-commands
+   ```
+3. Build and start the bot as a background service:
+   ```
+   docker compose up -d --build
+   ```
+4. `data/` is bind-mounted next to `docker-compose.yml`, so the SQLite file
+   survives container rebuilds/restarts. Check logs with
+   `docker compose logs -f`.
+
+### Option B: systemd (no Docker)
+
+1. On the server: `git clone`, then `npm ci`, `npm run build`, and create
+   `.env` in the project root (deploy-commands needs it once too:
+   `npm run deploy-commands`).
+2. Copy `deploy/rcbotapplications.service` to `/etc/systemd/system/`, editing
+   `User` and `WorkingDirectory` to match where you deployed the bot (the
+   `discordbot` user should own that directory).
+3. Enable and start it:
+   ```
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now rcbotapplications
+   sudo systemctl status rcbotapplications
+   journalctl -u rcbotapplications -f
+   ```
+4. To deploy an update: `git pull && npm ci && npm run build && sudo systemctl restart rcbotapplications`.
+
+Whichever option you use, re-run `npm run deploy-commands` only when the
+slash command *definitions* change (new options, new commands) — day-to-day
+question/config edits go through `/apply-setup` and `/apply-question` and
+need no redeploy.

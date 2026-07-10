@@ -1,0 +1,16 @@
+[Unit]
+Description=RCBotApplications Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=discordbot
+WorkingDirectory=/opt/rcbotapplications
+EnvironmentFile=/opt/rcbotapplications/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
