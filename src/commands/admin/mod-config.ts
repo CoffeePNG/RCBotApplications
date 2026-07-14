@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { setModLogChannel } from "../../db/guildSettingsRepo";
 import { Command } from "../types";
@@ -30,7 +31,7 @@ export const modConfigCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -41,7 +42,7 @@ export const modConfigCommand: Command = {
       setModLogChannel(guildId, channel.id);
       await interaction.reply({
         content: `Mod-log channel set to <#${channel.id}>.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   },

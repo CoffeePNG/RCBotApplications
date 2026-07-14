@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { addWarning } from "../../db/warningsRepo";
 import { postModLog } from "../../utils/logger";
@@ -23,7 +24,7 @@ export const warnCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -35,7 +36,7 @@ export const warnCommand: Command = {
 
     await interaction.reply({
       content: `Warned ${user.tag} (warning #${warning.id}).`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     const embed = new EmbedBuilder()

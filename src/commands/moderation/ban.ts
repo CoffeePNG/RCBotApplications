@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { postModLog } from "../../utils/logger";
 import { Command } from "../types";
@@ -29,7 +30,7 @@ export const banCommand: Command = {
     if (!guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -46,12 +47,12 @@ export const banCommand: Command = {
     } catch (error) {
       await interaction.reply({
         content: `Failed to ban ${user.tag}: ${(error as Error).message}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
-    await interaction.reply({ content: `Banned ${user.tag}.`, ephemeral: true });
+    await interaction.reply({ content: `Banned ${user.tag}.`, flags: MessageFlags.Ephemeral });
 
     const embed = new EmbedBuilder()
       .setTitle("Member Banned")

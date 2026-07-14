@@ -7,6 +7,7 @@ import {
   OverwriteResolvable,
   PermissionFlagsBits,
   TextChannel,
+  MessageFlags,
 } from "discord.js";
 import { getLeads, getTicketType } from "../db/ticketConfigRepo";
 import { claimTicket, closeTicket, createTicket, getTicketById } from "../db/ticketRepo";
@@ -29,7 +30,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   if (!ticketType) {
     await interaction.reply({
       content: "This ticket type is no longer configured. Please try again.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -105,7 +106,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
 
   await interaction.reply({
     content: `Your ticket has been created: <#${channel.id}>`,
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 }
 
@@ -113,27 +114,27 @@ export async function handleTicketClaim(interaction: ButtonInteraction) {
   const ticketId = Number(interaction.customId.slice(TICKET_CLAIM_PREFIX.length + 1));
   const ticket = getTicketById(ticketId);
   if (!ticket) {
-    await interaction.reply({ content: "Ticket not found.", ephemeral: true });
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
     return;
   }
   if (ticket.status !== "open") {
     await interaction.reply({
       content: `This ticket is already ${ticket.status}.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   const ticketType = getTicketType(ticket.guildId, ticket.typeKey);
   if (!ticketType) {
-    await interaction.reply({ content: "This ticket type is no longer configured.", ephemeral: true });
+    await interaction.reply({ content: "This ticket type is no longer configured.", flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (!canManageTicket(interaction.user.id, interaction.memberPermissions, ticketType.id)) {
     await interaction.reply({
       content: "Only assigned leads (or a server admin) can claim this ticket.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -160,17 +161,17 @@ export async function handleTicketClose(interaction: ButtonInteraction) {
   const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_PREFIX.length + 1));
   const ticket = getTicketById(ticketId);
   if (!ticket) {
-    await interaction.reply({ content: "Ticket not found.", ephemeral: true });
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
     return;
   }
   if (ticket.status === "closed") {
-    await interaction.reply({ content: "This ticket is already closed.", ephemeral: true });
+    await interaction.reply({ content: "This ticket is already closed.", flags: MessageFlags.Ephemeral });
     return;
   }
 
   const ticketType = getTicketType(ticket.guildId, ticket.typeKey);
   if (!ticketType) {
-    await interaction.reply({ content: "This ticket type is no longer configured.", ephemeral: true });
+    await interaction.reply({ content: "This ticket type is no longer configured.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -181,7 +182,7 @@ export async function handleTicketClose(interaction: ButtonInteraction) {
   if (!allowed) {
     await interaction.reply({
       content: "You don't have permission to close this ticket.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

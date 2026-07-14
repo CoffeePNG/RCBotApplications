@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { getLeads, getTicketTypes } from "../../db/ticketConfigRepo";
 import { getCounts } from "../../db/ticketRepo";
@@ -19,7 +20,7 @@ export const staffStatusCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -28,7 +29,7 @@ export const staffStatusCommand: Command = {
     if (types.length === 0) {
       await interaction.reply({
         content: "No ticket types are configured yet.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -48,6 +49,6 @@ export const staffStatusCommand: Command = {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

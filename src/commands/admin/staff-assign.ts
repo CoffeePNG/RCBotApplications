@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { addLead, getTicketType, removeLead } from "../../db/ticketConfigRepo";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
@@ -36,7 +37,7 @@ export const staffAssignCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -49,7 +50,7 @@ export const staffAssignCommand: Command = {
     if (!ticketType) {
       await interaction.reply({
         content: "Unknown ticket type. Pick one from the autocomplete list.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -60,7 +61,7 @@ export const staffAssignCommand: Command = {
         content: added
           ? `${user.tag} is now a lead for **${ticketType.displayName}**.`
           : `${user.tag} is already a lead for **${ticketType.displayName}**.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -70,7 +71,7 @@ export const staffAssignCommand: Command = {
       content: removed
         ? `${user.tag} is no longer a lead for **${ticketType.displayName}**.`
         : `${user.tag} wasn't a lead for **${ticketType.displayName}**.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   },
 

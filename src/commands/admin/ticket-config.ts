@@ -4,6 +4,7 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { getTicketType, setReviewChannel } from "../../db/ticketConfigRepo";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
@@ -39,7 +40,7 @@ export const ticketConfigCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -53,7 +54,7 @@ export const ticketConfigCommand: Command = {
       if (!ticketType) {
         await interaction.reply({
           content: "Unknown ticket type. Pick one from the autocomplete list.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -61,7 +62,7 @@ export const ticketConfigCommand: Command = {
       setReviewChannel(guildId, typeKey, channel.id);
       await interaction.reply({
         content: `Review/archive channel for **${ticketType.displayName}** set to <#${channel.id}>.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   },

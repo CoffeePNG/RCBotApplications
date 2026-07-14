@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { postModLog } from "../../utils/logger";
 import { Command } from "../types";
@@ -22,7 +23,7 @@ export const kickCommand: Command = {
     if (!guild) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -32,7 +33,7 @@ export const kickCommand: Command = {
 
     const member = await guild.members.fetch(user.id).catch(() => null);
     if (!member) {
-      await interaction.reply({ content: `${user.tag} isn't in this server.`, ephemeral: true });
+      await interaction.reply({ content: `${user.tag} isn't in this server.`, flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -41,12 +42,12 @@ export const kickCommand: Command = {
     } catch (error) {
       await interaction.reply({
         content: `Failed to kick ${user.tag}: ${(error as Error).message}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
-    await interaction.reply({ content: `Kicked ${user.tag}.`, ephemeral: true });
+    await interaction.reply({ content: `Kicked ${user.tag}.`, flags: MessageFlags.Ephemeral });
 
     const embed = new EmbedBuilder()
       .setTitle("Member Kicked")

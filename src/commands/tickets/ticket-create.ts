@@ -6,6 +6,7 @@ import {
   SlashCommandBuilder,
   TextInputBuilder,
   TextInputStyle,
+  MessageFlags,
 } from "discord.js";
 import { getTicketType } from "../../db/ticketConfigRepo";
 import { TICKET_CREATE_MODAL_PREFIX } from "../../handlers/ticketHandler";
@@ -34,7 +35,7 @@ export const ticketCreateCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -44,7 +45,7 @@ export const ticketCreateCommand: Command = {
     if (!ticketType) {
       await interaction.reply({
         content: "Unknown ticket type. Pick one from the autocomplete list.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

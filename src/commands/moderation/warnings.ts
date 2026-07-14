@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { getWarnings } from "../../db/warningsRepo";
 import { Command } from "../types";
@@ -21,7 +22,7 @@ export const warningsCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -32,7 +33,7 @@ export const warningsCommand: Command = {
     if (warnings.length === 0) {
       await interaction.reply({
         content: `${user.tag} has no active warnings.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -51,6 +52,6 @@ export const warningsCommand: Command = {
           .join("\n\n")
       );
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

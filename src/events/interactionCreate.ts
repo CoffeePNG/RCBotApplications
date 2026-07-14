@@ -1,4 +1,4 @@
-import { Interaction } from "discord.js";
+import { Interaction, MessageFlags } from "discord.js";
 import { Command } from "../commands/types";
 import {
   TICKET_CLAIM_PREFIX,
@@ -49,7 +49,7 @@ export async function handleInteraction(
       (interaction.isRepliable() && !interaction.replied && !interaction.deferred)
     ) {
       await interaction
-        .reply({ content: "Something went wrong handling that action.", ephemeral: true })
+        .reply({ content: "Something went wrong handling that action.", flags: MessageFlags.Ephemeral })
         .catch(() => null);
     }
   }

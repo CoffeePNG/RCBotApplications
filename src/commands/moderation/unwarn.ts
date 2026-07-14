@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  MessageFlags,
 } from "discord.js";
 import { deactivateWarning } from "../../db/warningsRepo";
 import { postModLog } from "../../utils/logger";
@@ -26,7 +27,7 @@ export const unwarnCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -38,7 +39,7 @@ export const unwarnCommand: Command = {
       content: cleared
         ? `Warning #${warningId} has been cleared.`
         : `No active warning #${warningId} found.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     if (cleared) {
