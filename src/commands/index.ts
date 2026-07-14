@@ -1,12 +1,26 @@
 import { Command } from "./types";
-import { applyCommand } from "./apply";
-import { applyQuestionCommand } from "./apply-question";
-import { applySetupCommand } from "./apply-setup";
-import { applicationsCommand } from "./applications";
+import { ticketCreateCommand } from "./tickets/ticket-create";
+import { staffAssignCommand } from "./admin/staff-assign";
+import { staffStatusCommand } from "./admin/staff-status";
+import { ticketConfigCommand } from "./admin/ticket-config";
+import { modConfigCommand } from "./admin/mod-config";
+import { banCommand } from "./moderation/ban";
+import { kickCommand } from "./moderation/kick";
+import { timeoutCommand } from "./moderation/timeout";
+import { warnCommand } from "./moderation/warn";
+import { unwarnCommand } from "./moderation/unwarn";
+import { warningsCommand } from "./moderation/warnings";
 
 export const commands: Command[] = [
-  applyCommand,
-  applyQuestionCommand,
-  applySetupCommand,
-  applicationsCommand,
+  ticketCreateCommand,
+  staffAssignCommand,
+  staffStatusCommand,
+  ticketConfigCommand,
+  modConfigCommand,
+  banCommand,
+  kickCommand,
+  timeoutCommand,
+  warnCommand,
+  unwarnCommand,
+  warningsCommand,
 ];

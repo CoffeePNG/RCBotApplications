@@ -12,7 +12,5 @@ export const config = {
   token: requireEnv("DISCORD_TOKEN"),
   clientId: requireEnv("DISCORD_CLIENT_ID"),
   guildId: requireEnv("DISCORD_GUILD_ID"),
-  databasePath: process.env.DATABASE_PATH || "data/applications.sqlite",
+  databasePath: process.env.DATABASE_PATH || "data/rcbot.sqlite",
 };
-
-export const MAX_QUESTIONS = 5;
