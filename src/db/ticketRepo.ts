@@ -8,6 +8,7 @@ function rowToTicket(row: any): Ticket {
     typeKey: row.type_key,
     creatorId: row.creator_id,
     channelId: row.channel_id,
+    messageId: row.message_id,
     status: row.status,
     claimedBy: row.claimed_by,
     createdAt: row.created_at,
@@ -42,6 +43,10 @@ export function getTicketByChannel(channelId: string): Ticket | null {
     .prepare(`SELECT * FROM tickets WHERE channel_id = ?`)
     .get(channelId) as any;
   return row ? rowToTicket(row) : null;
+}
+
+export function setMessageId(id: number, messageId: string): void {
+  db.prepare(`UPDATE tickets SET message_id = ? WHERE id = ?`).run(messageId, id);
 }
 
 export function claimTicket(id: number, userId: string): Ticket | null {

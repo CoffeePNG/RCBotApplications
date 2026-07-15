@@ -3,6 +3,7 @@ import { ticketCreateCommand } from "./tickets/ticket-create";
 import { staffAssignCommand } from "./admin/staff-assign";
 import { staffStatusCommand } from "./admin/staff-status";
 import { ticketConfigCommand } from "./admin/ticket-config";
+import { ticketPanelCommand } from "./admin/ticket-panel";
 import { modConfigCommand } from "./admin/mod-config";
 import { banCommand } from "./moderation/ban";
 import { kickCommand } from "./moderation/kick";
@@ -16,6 +17,7 @@ export const commands: Command[] = [
   staffAssignCommand,
   staffStatusCommand,
   ticketConfigCommand,
+  ticketPanelCommand,
   modConfigCommand,
   banCommand,
   kickCommand,

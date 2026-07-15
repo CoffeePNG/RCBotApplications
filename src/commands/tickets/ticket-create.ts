@@ -1,16 +1,12 @@
 import {
-  ActionRowBuilder,
   AutocompleteInteraction,
   ChatInputCommandInteraction,
-  ModalBuilder,
   SlashCommandBuilder,
-  TextInputBuilder,
-  TextInputStyle,
   MessageFlags,
 } from "discord.js";
 import { getTicketType } from "../../db/ticketConfigRepo";
-import { TICKET_CREATE_MODAL_PREFIX } from "../../handlers/ticketHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
+import { buildTicketDetailsModal } from "../../utils/ticketModal";
 import { Command } from "../types";
 
 export const ticketCreateCommand: Command = {
@@ -50,20 +46,7 @@ export const ticketCreateCommand: Command = {
       return;
     }
 
-    const modal = new ModalBuilder()
-      .setCustomId(`${TICKET_CREATE_MODAL_PREFIX}:${typeKey}`)
-      .setTitle(ticketType.displayName.slice(0, 45));
-
-    const details = new TextInputBuilder()
-      .setCustomId("details")
-      .setLabel("What's this about?")
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true)
-      .setMaxLength(1000);
-
-    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(details));
-
-    await interaction.showModal(modal);
+    await interaction.showModal(buildTicketDetailsModal(ticketType));
   },
 
   async autocomplete(interaction: AutocompleteInteraction) {

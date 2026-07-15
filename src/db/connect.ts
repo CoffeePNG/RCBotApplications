@@ -15,7 +15,9 @@ db.pragma("foreign_keys = ON");
 db.exec(`
   CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id TEXT PRIMARY KEY,
-    mod_log_channel_id TEXT
+    mod_log_channel_id TEXT,
+    panel_channel_id TEXT,
+    panel_message_id TEXT
   );
 
   CREATE TABLE IF NOT EXISTS ticket_configs (
@@ -43,6 +45,7 @@ db.exec(`
     type_key TEXT NOT NULL,
     creator_id TEXT NOT NULL,
     channel_id TEXT NOT NULL,
+    message_id TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     claimed_by TEXT,
     created_at INTEGER NOT NULL,
@@ -66,3 +69,14 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings (guild_id, user_id);
 `);
+
+function ensureColumn(table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+ensureColumn("tickets", "message_id", "TEXT");
+ensureColumn("guild_settings", "panel_channel_id", "TEXT");
+ensureColumn("guild_settings", "panel_message_id", "TEXT");

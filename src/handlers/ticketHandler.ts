@@ -3,22 +3,47 @@ import {
   ButtonInteraction,
   ChannelType,
   EmbedBuilder,
+  MessageFlags,
   ModalSubmitInteraction,
   OverwriteResolvable,
   PermissionFlagsBits,
+  StringSelectMenuInteraction,
   TextChannel,
-  MessageFlags,
 } from "discord.js";
 import { getLeads, getTicketType } from "../db/ticketConfigRepo";
-import { claimTicket, closeTicket, createTicket, getTicketById } from "../db/ticketRepo";
+import {
+  claimTicket,
+  closeTicket,
+  createTicket,
+  getTicketById,
+  setMessageId,
+} from "../db/ticketRepo";
 import { buildChannelName, formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
-import { applyTicketStatus, buildTicketButtons, buildTicketEmbed } from "../utils/ticketEmbeds";
+import {
+  applyTicketStatus,
+  buildCloseConfirmRow,
+  buildTicketButtons,
+  buildTicketEmbed,
+  buildTranscriptLogEmbed,
+} from "../utils/ticketEmbeds";
+import { buildTicketDetailsModal } from "../utils/ticketModal";
 import { canManageTicket } from "../utils/permissions";
 import { generateTranscript } from "../utils/transcript";
+import {
+  TICKET_CLAIM_PREFIX,
+  TICKET_CLOSE_CANCEL_PREFIX,
+  TICKET_CLOSE_CONFIRM_PREFIX,
+  TICKET_CLOSE_PREFIX,
+  TICKET_CREATE_MODAL_PREFIX,
+} from "./ticketConstants";
 
-export const TICKET_CREATE_MODAL_PREFIX = "ticket_create_modal";
-export const TICKET_CLAIM_PREFIX = "ticket_claim";
-export const TICKET_CLOSE_PREFIX = "ticket_close";
+export {
+  TICKET_CLAIM_PREFIX,
+  TICKET_CLOSE_CANCEL_PREFIX,
+  TICKET_CLOSE_CONFIRM_PREFIX,
+  TICKET_CLOSE_PREFIX,
+  TICKET_CREATE_MODAL_PREFIX,
+} from "./ticketConstants";
 
 export async function handleTicketCreateModal(interaction: ModalSubmitInteraction) {
   const guildId = interaction.guildId;
@@ -87,11 +112,12 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
 
   const pingLine = leads.length > 0 ? leads.map((id) => `<@${id}>`).join(" ") : null;
 
-  await channel.send({
+  const message = await channel.send({
     content: [pingLine, openMessage].filter(Boolean).join("\n"),
     embeds: [embed],
     components: [row],
   });
+  setMessageId(ticket.id, message.id);
 
   if (ticketType.reviewChannelId) {
     const reviewChannel = await interaction.client.channels
@@ -110,8 +136,25 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   });
 }
 
+export async function handleTicketPanelSelect(interaction: StringSelectMenuInteraction) {
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const typeKey = interaction.values[0];
+  const ticketType = getTicketType(guildId, typeKey);
+  if (!ticketType) {
+    await interaction.reply({
+      content: "This ticket type is no longer configured.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await interaction.showModal(buildTicketDetailsModal(ticketType));
+}
+
 export async function handleTicketClaim(interaction: ButtonInteraction) {
-  const ticketId = Number(interaction.customId.slice(TICKET_CLAIM_PREFIX.length + 1));
+  const ticketId = Number(interaction.customId.slice(TICKET_CLAIM_PREFIX.length));
   const ticket = getTicketById(ticketId);
   if (!ticket) {
     await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
@@ -127,7 +170,10 @@ export async function handleTicketClaim(interaction: ButtonInteraction) {
 
   const ticketType = getTicketType(ticket.guildId, ticket.typeKey);
   if (!ticketType) {
-    await interaction.reply({ content: "This ticket type is no longer configured.", flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      content: "This ticket type is no longer configured.",
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 
@@ -157,8 +203,19 @@ export async function handleTicketClaim(interaction: ButtonInteraction) {
   await interaction.followUp({ content: claimMessage });
 }
 
-export async function handleTicketClose(interaction: ButtonInteraction) {
-  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_PREFIX.length + 1));
+function canCloseTicket(
+  interaction: ButtonInteraction,
+  ticketConfigId: number,
+  creatorId: string
+): boolean {
+  return (
+    canManageTicket(interaction.user.id, interaction.memberPermissions, ticketConfigId) ||
+    interaction.user.id === creatorId
+  );
+}
+
+export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_PREFIX.length));
   const ticket = getTicketById(ticketId);
   if (!ticket) {
     await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
@@ -171,18 +228,54 @@ export async function handleTicketClose(interaction: ButtonInteraction) {
 
   const ticketType = getTicketType(ticket.guildId, ticket.typeKey);
   if (!ticketType) {
-    await interaction.reply({ content: "This ticket type is no longer configured.", flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      content: "This ticket type is no longer configured.",
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 
-  const allowed =
-    canManageTicket(interaction.user.id, interaction.memberPermissions, ticketType.id) ||
-    interaction.user.id === ticket.creatorId;
-
-  if (!allowed) {
+  if (!canCloseTicket(interaction, ticketType.id, ticket.creatorId)) {
     await interaction.reply({
       content: "You don't have permission to close this ticket.",
       flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await interaction.reply({
+    content: "Are you sure you want to close this ticket? This can't be undone.",
+    components: [buildCloseConfirmRow(ticketId)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+export async function handleTicketCloseCancel(interaction: ButtonInteraction) {
+  await interaction.update({ content: "Close cancelled.", components: [] });
+}
+
+export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_CONFIRM_PREFIX.length));
+  const ticket = getTicketById(ticketId);
+  if (!ticket) {
+    await interaction.update({ content: "Ticket not found.", components: [] });
+    return;
+  }
+  if (ticket.status === "closed") {
+    await interaction.update({ content: "This ticket is already closed.", components: [] });
+    return;
+  }
+
+  const ticketType = getTicketType(ticket.guildId, ticket.typeKey);
+  if (!ticketType) {
+    await interaction.update({ content: "This ticket type is no longer configured.", components: [] });
+    return;
+  }
+
+  if (!canCloseTicket(interaction, ticketType.id, ticket.creatorId)) {
+    await interaction.update({
+      content: "You don't have permission to close this ticket.",
+      components: [],
     });
     return;
   }
@@ -199,24 +292,29 @@ export async function handleTicketClose(interaction: ButtonInteraction) {
       .fetch(ticketType.reviewChannelId)
       .catch(() => null);
     if (reviewChannel instanceof TextChannel) {
+      const logEmbed = buildTranscriptLogEmbed(closed, ticketType, transcriptText);
       const attachment = new AttachmentBuilder(Buffer.from(transcriptText, "utf-8"), {
         name: `ticket-${ticketId}-transcript.txt`,
       });
-      await reviewChannel.send({
-        content: `**${ticketType.displayName}** ticket #${ticketId} closed by <@${interaction.user.id}> (opened by <@${ticket.creatorId}>).`,
-        files: [attachment],
-      });
+      await reviewChannel.send({ embeds: [logEmbed], files: [attachment] });
     }
   }
 
-  const baseEmbed = interaction.message.embeds[0]
-    ? EmbedBuilder.from(interaction.message.embeds[0])
-    : new EmbedBuilder();
-  const embed = applyTicketStatus(baseEmbed, closed);
-  const row = buildTicketButtons(ticketId, true, true);
-  await interaction.update({ embeds: [embed], components: [row] });
-  await interaction.followUp({
+  if (closed.messageId) {
+    const originalMessage = await channel.messages.fetch(closed.messageId).catch(() => null);
+    if (originalMessage) {
+      const baseEmbed = originalMessage.embeds[0]
+        ? EmbedBuilder.from(originalMessage.embeds[0])
+        : new EmbedBuilder();
+      const embed = applyTicketStatus(baseEmbed, closed);
+      const row = buildTicketButtons(ticketId, true, true);
+      await originalMessage.edit({ embeds: [embed], components: [row] }).catch(() => null);
+    }
+  }
+
+  await interaction.update({
     content: "This ticket is now closed. The channel will be deleted in 5 seconds.",
+    components: [],
   });
 
   setTimeout(() => {

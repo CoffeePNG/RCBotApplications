@@ -18,6 +18,7 @@ export interface Ticket {
   typeKey: string;
   creatorId: string;
   channelId: string;
+  messageId: string | null;
   status: TicketStatus;
   claimedBy: string | null;
   createdAt: number;
@@ -39,4 +40,6 @@ export interface Warning {
 export interface GuildSettings {
   guildId: string;
   modLogChannelId: string | null;
+  panelChannelId: string | null;
+  panelMessageId: string | null;
 }

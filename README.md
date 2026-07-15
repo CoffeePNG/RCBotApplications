@@ -64,10 +64,14 @@ resolved at send time (`src/utils/ticketFormatter.ts`).
 **Tickets**
 - `/ticket create type:<autocomplete>` — anyone; opens a modal for ticket
   details, then creates a private ticket channel.
-- **Claim** / **Close** buttons on the ticket's message — Claim is restricted
-  to that type's configured leads (or anyone with `Manage Server`); Close is
-  restricted to a lead, the claimant, `Manage Server` holders, or the ticket's
-  creator.
+- **Ticket panel** — a persistent embed + dropdown (Ticket Tool style) that
+  members click instead of typing a slash command; see below.
+- **Claim** button on the ticket's message — restricted to that type's
+  configured leads (or anyone with `Manage Server`).
+- **Close** button — restricted to a lead, the claimant, `Manage Server`
+  holders, or the ticket's creator. Clicking it asks for confirmation
+  (ephemeral **Confirm Close** / **Cancel** buttons) before anything happens,
+  so a misclick can't nuke a ticket.
 
 **Admin** (require `Manage Server`)
 - `/staff-assign type:<autocomplete> action:<add|remove> user:<user>` —
@@ -76,6 +80,12 @@ resolved at send time (`src/utils/ticketFormatter.ts`).
   channel, and live open/claimed/closed counts.
 - `/ticket-config review-channel type:<autocomplete> channel:<channel>` —
   (re)point a ticket type's review/archive channel.
+- `/ticket-panel post channel:<channel>` — post the ticket creation panel
+  (embed + select menu, one option per configured ticket type) in a channel.
+  Re-running it (even in a different channel) edits the existing panel
+  message in place rather than leaving duplicates behind — the panel's
+  channel/message ID is tracked in `guild_settings`. Run this again any time
+  ticket types change, so the dropdown reflects the current list.
 - `/mod-config log-channel channel:<channel>` — set the moderation log
   channel.
 
@@ -89,6 +99,16 @@ resolved at send time (`src/utils/ticketFormatter.ts`).
 
 All moderation actions that succeed are logged as an embed to the channel set
 via `/mod-config log-channel`, if configured.
+
+## Ticket archive logs
+
+When a ticket closes, its review/archive channel gets one embed per ticket
+(color-coded, titled `<Ticket Type> — Ticket #<id>`, with Opened/Claimed/Closed
+by + duration fields) so consecutive closures are easy to tell apart at a
+glance instead of blending into a wall of plain text. The transcript itself is
+in the embed description as a code block (fenced with triple backticks) for
+readability; if it's too long to fit, it's truncated there and the full
+transcript is still attached as a `.txt` file on the same message.
 
 ## Adding a new ticket type
 
@@ -123,8 +143,10 @@ the configured guild (if they don't already exist). Then, in Discord:
 2. `/staff-assign type:application action:add user:@SomeLead` (repeat per
    type/lead)
 3. `/mod-config log-channel channel:#mod-log`
+4. `/ticket-panel post channel:#create-a-ticket` (optional — gives members a
+   dropdown instead of needing to know the slash command)
 
-Members can then run `/ticket create`.
+Members can then run `/ticket create` or use the panel.
 
 ## Required bot permissions/intents
 

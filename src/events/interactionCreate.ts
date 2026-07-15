@@ -2,11 +2,19 @@ import { Interaction, MessageFlags } from "discord.js";
 import { Command } from "../commands/types";
 import {
   TICKET_CLAIM_PREFIX,
+  TICKET_CLOSE_CANCEL_PREFIX,
+  TICKET_CLOSE_CONFIRM_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_PANEL_SELECT_ID,
+} from "../handlers/ticketConstants";
+import {
   handleTicketClaim,
-  handleTicketClose,
+  handleTicketCloseCancel,
+  handleTicketCloseConfirm,
+  handleTicketCloseRequest,
   handleTicketCreateModal,
+  handleTicketPanelSelect,
 } from "../handlers/ticketHandler";
 
 export async function handleInteraction(
@@ -35,19 +43,28 @@ export async function handleInteraction(
       return;
     }
 
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === TICKET_PANEL_SELECT_ID) {
+        await handleTicketPanelSelect(interaction);
+      }
+      return;
+    }
+
     if (interaction.isButton()) {
-      if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
-        await handleTicketClaim(interaction);
+      if (interaction.customId.startsWith(TICKET_CLOSE_CONFIRM_PREFIX)) {
+        await handleTicketCloseConfirm(interaction);
+      } else if (interaction.customId.startsWith(TICKET_CLOSE_CANCEL_PREFIX)) {
+        await handleTicketCloseCancel(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
-        await handleTicketClose(interaction);
+        await handleTicketCloseRequest(interaction);
+      } else if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
+        await handleTicketClaim(interaction);
       }
       return;
     }
   } catch (error) {
     console.error("Error handling interaction:", error);
-    if (
-      (interaction.isRepliable() && !interaction.replied && !interaction.deferred)
-    ) {
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
       await interaction
         .reply({ content: "Something went wrong handling that action.", flags: MessageFlags.Ephemeral })
         .catch(() => null);
