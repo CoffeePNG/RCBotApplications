@@ -49,6 +49,10 @@ export function setMessageId(id: number, messageId: string): void {
   db.prepare(`UPDATE tickets SET message_id = ? WHERE id = ?`).run(messageId, id);
 }
 
+export function setChannelId(id: number, channelId: string): void {
+  db.prepare(`UPDATE tickets SET channel_id = ? WHERE id = ?`).run(channelId, id);
+}
+
 export function claimTicket(id: number, userId: string): Ticket | null {
   db.prepare(
     `UPDATE tickets SET status = 'claimed', claimed_by = ?, claimed_at = ? WHERE id = ?`

@@ -1,23 +1,19 @@
 import {
-  ActionRowBuilder,
   ChannelType,
   ChatInputCommandInteraction,
-  EmbedBuilder,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
-  StringSelectMenuBuilder,
   TextChannel,
 } from "discord.js";
-import { getGuildSettings, setPanelInfo } from "../../db/guildSettingsRepo";
-import { getTicketTypes } from "../../db/ticketConfigRepo";
-import { TICKET_PANEL_SELECT_ID } from "../../handlers/ticketConstants";
+import { getGuildSettings, setPanelCustomization, setPanelInfo } from "../../db/guildSettingsRepo";
+import { buildPanelContent, refreshPostedPanel } from "../../utils/ticketPanel";
 import { Command } from "../types";
 
 export const ticketPanelCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("ticket-panel")
-    .setDescription("Post or update the ticket creation panel.")
+    .setDescription("Post or customize the ticket creation panel.")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((sub) =>
       sub
@@ -29,6 +25,23 @@ export const ticketPanelCommand: Command = {
             .setDescription("Channel to post the panel in")
             .addChannelTypes(ChannelType.GuildText)
             .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("customize")
+        .setDescription("Customize the panel's title/description, or reset to defaults.")
+        .addStringOption((opt) =>
+          opt.setName("title").setDescription("Panel embed title").setMaxLength(256)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("description")
+            .setDescription("Panel embed description. Use {types} to insert the ticket type list.")
+            .setMaxLength(3800)
+        )
+        .addBooleanOption((opt) =>
+          opt.setName("reset").setDescription("Reset title and description back to defaults")
         )
     ),
 
@@ -42,8 +55,38 @@ export const ticketPanelCommand: Command = {
       return;
     }
 
-    const types = getTicketTypes(guildId);
-    if (types.length === 0) {
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === "customize") {
+      const reset = interaction.options.getBoolean("reset") ?? false;
+      const title = interaction.options.getString("title");
+      const description = interaction.options.getString("description");
+
+      if (reset) {
+        setPanelCustomization(guildId, null, null);
+      } else if (title === null && description === null) {
+        await interaction.reply({
+          content: "Provide a title and/or description to change, or set reset:true.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      } else {
+        setPanelCustomization(guildId, title, description);
+      }
+
+      const refreshed = await refreshPostedPanel(interaction.client, guildId);
+      await interaction.reply({
+        content: reset
+          ? `Panel text reset to defaults.${refreshed ? " The live panel has been updated." : ""}`
+          : `Panel text updated.${refreshed ? " The live panel has been updated." : " Run /ticket-panel post to publish it."}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // sub === "post"
+    const content = buildPanelContent(guildId);
+    if (!content) {
       await interaction.reply({
         content: "No ticket types are configured yet.",
         flags: MessageFlags.Ephemeral,
@@ -63,26 +106,6 @@ export const ticketPanelCommand: Command = {
       return;
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Open a Ticket")
-      .setColor(0x5865f2)
-      .setDescription(
-        `${types.map((t) => `**${t.displayName}** — ${t.department}`).join("\n")}\n\nSelect a category below to get started.`
-      );
-
-    const select = new StringSelectMenuBuilder()
-      .setCustomId(TICKET_PANEL_SELECT_ID)
-      .setPlaceholder("Select a ticket type...")
-      .addOptions(
-        types.map((t) => ({
-          label: t.displayName,
-          value: t.typeKey,
-          description: t.department.slice(0, 100),
-        }))
-      );
-
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-
     const settings = getGuildSettings(guildId);
     let posted = null;
     if (settings.panelChannelId === channelOption.id && settings.panelMessageId) {
@@ -90,17 +113,17 @@ export const ticketPanelCommand: Command = {
         .fetch(settings.panelMessageId)
         .catch(() => null);
       if (existing) {
-        posted = await existing.edit({ embeds: [embed], components: [row] });
+        posted = await existing.edit({ embeds: [content.embed], components: [content.row] });
       }
     }
     if (!posted) {
-      posted = await targetChannel.send({ embeds: [embed], components: [row] });
+      posted = await targetChannel.send({ embeds: [content.embed], components: [content.row] });
     }
 
     setPanelInfo(guildId, channelOption.id, posted.id);
 
     await interaction.reply({
-      content: `Ticket panel posted in <#${channelOption.id}>. Re-run this command any time (e.g. after adding a ticket type) to refresh it in place.`,
+      content: `Ticket panel posted in <#${channelOption.id}>. Re-run this any time (e.g. after adding a ticket type) to refresh it in place.`,
       flags: MessageFlags.Ephemeral,
     });
   },

@@ -42,4 +42,6 @@ export interface GuildSettings {
   modLogChannelId: string | null;
   panelChannelId: string | null;
   panelMessageId: string | null;
+  panelTitle: string | null;
+  panelDescription: string | null;
 }

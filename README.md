@@ -80,12 +80,20 @@ resolved at send time (`src/utils/ticketFormatter.ts`).
   channel, and live open/claimed/closed counts.
 - `/ticket-config review-channel type:<autocomplete> channel:<channel>` —
   (re)point a ticket type's review/archive channel.
+- `/ticket-config open-message type:<autocomplete> message:<text>` /
+  `/ticket-config claim-message type:<autocomplete> message:<text>` — edit a
+  ticket type's message templates at runtime. Takes effect on the next
+  ticket immediately, no restart.
 - `/ticket-panel post channel:<channel>` — post the ticket creation panel
   (embed + select menu, one option per configured ticket type) in a channel.
   Re-running it (even in a different channel) edits the existing panel
   message in place rather than leaving duplicates behind — the panel's
   channel/message ID is tracked in `guild_settings`. Run this again any time
   ticket types change, so the dropdown reflects the current list.
+- `/ticket-panel customize title:<text> description:<text> reset:<bool>` —
+  change the panel embed's title/description (use `{types}` in the
+  description to insert the ticket type list) or `reset:true` to go back to
+  defaults. If a panel is already posted, it's refreshed live immediately.
 - `/mod-config log-channel channel:<channel>` — set the moderation log
   channel.
 
@@ -106,9 +114,17 @@ When a ticket closes, its review/archive channel gets one embed per ticket
 (color-coded, titled `<Ticket Type> — Ticket #<id>`, with Opened/Claimed/Closed
 by + duration fields) so consecutive closures are easy to tell apart at a
 glance instead of blending into a wall of plain text. The transcript itself is
-in the embed description as a code block (fenced with triple backticks) for
-readability; if it's too long to fit, it's truncated there and the full
+plain text in the embed description (not a code block — Discord doesn't
+resolve `<@id>` mentions to names inside code blocks, so usernames would show
+as raw IDs); if it's too long to fit, it's truncated there and the full
 transcript is still attached as a `.txt` file on the same message.
+
+## Ticket channel names
+
+Channels are named `<prefix>-<username>-<ticket id>` (e.g. `application-coffee-4`).
+The numeric suffix is the same ticket ID shown in the embed footer and the
+archive log, so a channel name and its eventual archive entry are always
+easy to match up.
 
 ## Adding a new ticket type
 

@@ -17,7 +17,9 @@ db.exec(`
     guild_id TEXT PRIMARY KEY,
     mod_log_channel_id TEXT,
     panel_channel_id TEXT,
-    panel_message_id TEXT
+    panel_message_id TEXT,
+    panel_title TEXT,
+    panel_description TEXT
   );
 
   CREATE TABLE IF NOT EXISTS ticket_configs (
@@ -80,3 +82,5 @@ function ensureColumn(table: string, column: string, definition: string): void {
 ensureColumn("tickets", "message_id", "TEXT");
 ensureColumn("guild_settings", "panel_channel_id", "TEXT");
 ensureColumn("guild_settings", "panel_message_id", "TEXT");
+ensureColumn("guild_settings", "panel_title", "TEXT");
+ensureColumn("guild_settings", "panel_description", "TEXT");

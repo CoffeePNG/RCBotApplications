@@ -10,6 +10,8 @@ export function getGuildSettings(guildId: string): GuildSettings {
     modLogChannelId: row ? row.mod_log_channel_id : null,
     panelChannelId: row ? row.panel_channel_id : null,
     panelMessageId: row ? row.panel_message_id : null,
+    panelTitle: row ? row.panel_title : null,
+    panelDescription: row ? row.panel_description : null,
   };
 }
 
@@ -29,4 +31,29 @@ export function setPanelInfo(guildId: string, channelId: string, messageId: stri
        panel_channel_id = excluded.panel_channel_id,
        panel_message_id = excluded.panel_message_id`
   ).run(guildId, channelId, messageId);
+}
+
+export function setPanelCustomization(
+  guildId: string,
+  title: string | null,
+  description: string | null
+): void {
+  const current = getGuildSettings(guildId);
+  const nextTitle = title !== null ? title : current.panelTitle;
+  const nextDescription = description !== null ? description : current.panelDescription;
+  db.prepare(
+    `INSERT INTO guild_settings (guild_id, panel_title, panel_description)
+     VALUES (?, ?, ?)
+     ON CONFLICT(guild_id) DO UPDATE SET
+       panel_title = excluded.panel_title,
+       panel_description = excluded.panel_description`
+  ).run(guildId, nextTitle, nextDescription);
+}
+
+export function resetPanelCustomization(guildId: string): void {
+  db.prepare(
+    `INSERT INTO guild_settings (guild_id, panel_title, panel_description)
+     VALUES (?, NULL, NULL)
+     ON CONFLICT(guild_id) DO UPDATE SET panel_title = NULL, panel_description = NULL`
+  ).run(guildId);
 }

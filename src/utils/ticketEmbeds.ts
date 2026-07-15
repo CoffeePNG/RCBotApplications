@@ -13,7 +13,7 @@ import {
 import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
 
-const TRANSCRIPT_PREVIEW_LIMIT = 3500;
+const TRANSCRIPT_PREVIEW_LIMIT = 3800;
 
 function statusColor(status: Ticket["status"]): number {
   if (status === "claimed") return 0xfee75c;
@@ -21,33 +21,7 @@ function statusColor(status: Ticket["status"]): number {
   return 0x5865f2;
 }
 
-export function buildTicketEmbed(
-  ticket: Ticket,
-  ticketType: TicketTypeConfig,
-  details: string,
-  creatorTag: string
-): EmbedBuilder {
-  const embed = new EmbedBuilder()
-    .setTitle(ticketType.displayName)
-    .setColor(statusColor(ticket.status))
-    .setDescription(details.slice(0, 4000))
-    .addFields({ name: "Opened by", value: `${creatorTag} (<@${ticket.creatorId}>)` })
-    .setFooter({ text: `Ticket #${ticket.id} • ${ticketType.department}` })
-    .setTimestamp(ticket.createdAt);
-
-  if (ticket.status === "claimed" && ticket.claimedBy) {
-    embed.addFields({ name: "Claimed by", value: `<@${ticket.claimedBy}>` });
-  }
-  if (ticket.status === "closed") {
-    embed.addFields({
-      name: "Closed",
-      value: ticket.closedBy ? `by <@${ticket.closedBy}>` : "closed",
-    });
-  }
-
-  return embed;
-}
-
+/** Sets an embed's color and adds Claimed/Closed fields to match a ticket's current status. */
 export function applyTicketStatus(embed: EmbedBuilder, ticket: Ticket): EmbedBuilder {
   embed.setColor(statusColor(ticket.status));
   if (ticket.status === "claimed" && ticket.claimedBy) {
@@ -62,6 +36,24 @@ export function applyTicketStatus(embed: EmbedBuilder, ticket: Ticket): EmbedBui
   return embed;
 }
 
+/** Builds the embed posted on ticket creation (status is always "open" at this point). */
+export function buildTicketEmbed(
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  details: string,
+  creatorTag: string
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(ticketType.displayName)
+    .setDescription(details.slice(0, 4000))
+    .addFields({ name: "Opened by", value: `${creatorTag} (<@${ticket.creatorId}>)` })
+    .setFooter({ text: `Ticket #${ticket.id} • ${ticketType.department}` })
+    .setTimestamp(ticket.createdAt);
+
+  return applyTicketStatus(embed, ticket);
+}
+
+/** Claim/Close buttons shown on a ticket's message; each disables once it no longer applies. */
 export function buildTicketButtons(
   ticketId: number,
   claimDisabled: boolean,
@@ -81,6 +73,7 @@ export function buildTicketButtons(
   );
 }
 
+/** Confirm/Cancel buttons shown on the ephemeral "are you sure?" close prompt. */
 export function buildCloseConfirmRow(ticketId: number): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -103,6 +96,7 @@ function formatDuration(ms: number): string {
   return `${days}d ${hours % 24}h`;
 }
 
+/** Builds one archive-channel embed per closed ticket; transcript is plain text (not a code block) so mentions still resolve. */
 export function buildTranscriptLogEmbed(
   ticket: Ticket,
   ticketType: TicketTypeConfig,
@@ -110,13 +104,13 @@ export function buildTranscriptLogEmbed(
 ): EmbedBuilder {
   const preview =
     transcriptText.length > TRANSCRIPT_PREVIEW_LIMIT
-      ? `${transcriptText.slice(0, TRANSCRIPT_PREVIEW_LIMIT)}\n… (truncated, see attached file for the full transcript)`
+      ? `${transcriptText.slice(0, TRANSCRIPT_PREVIEW_LIMIT)}\n… *(truncated, see attached file for the full transcript)*`
       : transcriptText;
 
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setTitle(`${ticketType.displayName} — Ticket #${ticket.id}`)
     .setColor(0x99aab5)
-    .setDescription(`\`\`\`\n${preview || "(no messages)"}\n\`\`\``)
+    .setDescription(preview || "*(no messages)*")
     .addFields(
       { name: "Opened by", value: `<@${ticket.creatorId}>`, inline: true },
       {
@@ -131,14 +125,9 @@ export function buildTranscriptLogEmbed(
       },
       {
         name: "Duration",
-        value:
-          ticket.closedAt != null
-            ? formatDuration(ticket.closedAt - ticket.createdAt)
-            : "unknown",
+        value: ticket.closedAt != null ? formatDuration(ticket.closedAt - ticket.createdAt) : "unknown",
       }
     )
     .setFooter({ text: `${ticketType.typeKey} • ticket #${ticket.id}` })
     .setTimestamp(ticket.closedAt ?? Date.now());
-
-  return embed;
 }

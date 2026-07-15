@@ -63,6 +63,20 @@ export function setReviewChannel(
   return info.changes > 0;
 }
 
+export function setOpenMessage(guildId: string, typeKey: string, message: string): boolean {
+  const info = db
+    .prepare(`UPDATE ticket_configs SET open_message = ? WHERE guild_id = ? AND type_key = ?`)
+    .run(message, guildId, typeKey);
+  return info.changes > 0;
+}
+
+export function setClaimMessage(guildId: string, typeKey: string, message: string): boolean {
+  const info = db
+    .prepare(`UPDATE ticket_configs SET claim_message = ? WHERE guild_id = ? AND type_key = ?`)
+    .run(message, guildId, typeKey);
+  return info.changes > 0;
+}
+
 export function getLeads(ticketConfigId: number): string[] {
   const rows = db
     .prepare(`SELECT user_id FROM ticket_leads WHERE ticket_config_id = ?`)
