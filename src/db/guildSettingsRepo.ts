@@ -33,27 +33,13 @@ export function setPanelInfo(guildId: string, channelId: string, messageId: stri
   ).run(guildId, channelId, messageId);
 }
 
-export function setPanelCustomization(
-  guildId: string,
-  title: string | null,
-  description: string | null
-): void {
-  const current = getGuildSettings(guildId);
-  const nextTitle = title !== null ? title : current.panelTitle;
-  const nextDescription = description !== null ? description : current.panelDescription;
+/** Sets the panel's title/description; pass null for either to reset it back to the default. */
+export function setPanelText(guildId: string, title: string | null, description: string | null): void {
   db.prepare(
     `INSERT INTO guild_settings (guild_id, panel_title, panel_description)
      VALUES (?, ?, ?)
      ON CONFLICT(guild_id) DO UPDATE SET
        panel_title = excluded.panel_title,
        panel_description = excluded.panel_description`
-  ).run(guildId, nextTitle, nextDescription);
-}
-
-export function resetPanelCustomization(guildId: string): void {
-  db.prepare(
-    `INSERT INTO guild_settings (guild_id, panel_title, panel_description)
-     VALUES (?, NULL, NULL)
-     ON CONFLICT(guild_id) DO UPDATE SET panel_title = NULL, panel_description = NULL`
-  ).run(guildId);
+  ).run(guildId, title, description);
 }

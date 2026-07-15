@@ -8,6 +8,7 @@ export interface TicketTypeConfig {
   reviewChannelId: string | null;
   openMessage: string;
   claimMessage: string;
+  optionDescription: string | null;
 }
 
 export type TicketStatus = "open" | "claimed" | "closed";

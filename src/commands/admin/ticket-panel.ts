@@ -6,8 +6,9 @@ import {
   SlashCommandBuilder,
   TextChannel,
 } from "discord.js";
-import { getGuildSettings, setPanelCustomization, setPanelInfo } from "../../db/guildSettingsRepo";
-import { buildPanelContent, refreshPostedPanel } from "../../utils/ticketPanel";
+import { getGuildSettings, setPanelInfo } from "../../db/guildSettingsRepo";
+import { buildPanelEditModal } from "../../handlers/configHandler";
+import { buildPanelContent } from "../../utils/ticketPanel";
 import { Command } from "../types";
 
 export const ticketPanelCommand: Command = {
@@ -28,21 +29,7 @@ export const ticketPanelCommand: Command = {
         )
     )
     .addSubcommand((sub) =>
-      sub
-        .setName("customize")
-        .setDescription("Customize the panel's title/description, or reset to defaults.")
-        .addStringOption((opt) =>
-          opt.setName("title").setDescription("Panel embed title").setMaxLength(256)
-        )
-        .addStringOption((opt) =>
-          opt
-            .setName("description")
-            .setDescription("Panel embed description. Use {types} to insert the ticket type list.")
-            .setMaxLength(3800)
-        )
-        .addBooleanOption((opt) =>
-          opt.setName("reset").setDescription("Reset title and description back to defaults")
-        )
+      sub.setName("customize").setDescription("Edit the panel's title and description.")
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -58,29 +45,7 @@ export const ticketPanelCommand: Command = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === "customize") {
-      const reset = interaction.options.getBoolean("reset") ?? false;
-      const title = interaction.options.getString("title");
-      const description = interaction.options.getString("description");
-
-      if (reset) {
-        setPanelCustomization(guildId, null, null);
-      } else if (title === null && description === null) {
-        await interaction.reply({
-          content: "Provide a title and/or description to change, or set reset:true.",
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      } else {
-        setPanelCustomization(guildId, title, description);
-      }
-
-      const refreshed = await refreshPostedPanel(interaction.client, guildId);
-      await interaction.reply({
-        content: reset
-          ? `Panel text reset to defaults.${refreshed ? " The live panel has been updated." : ""}`
-          : `Panel text updated.${refreshed ? " The live panel has been updated." : " Run /ticket-panel post to publish it."}`,
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.showModal(buildPanelEditModal(guildId));
       return;
     }
 

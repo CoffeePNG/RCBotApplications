@@ -12,6 +12,7 @@ function rowToConfig(row: any): TicketTypeConfig {
     reviewChannelId: row.review_channel_id,
     openMessage: row.open_message,
     claimMessage: row.claim_message,
+    optionDescription: row.option_description,
   };
 }
 
@@ -43,8 +44,8 @@ export function ensureTicketType(
   const info = db
     .prepare(
       `INSERT INTO ticket_configs
-         (guild_id, type_key, display_name, department, channel_prefix, open_message, claim_message)
-       VALUES (@guildId, @typeKey, @displayName, @department, @channelPrefix, @openMessage, @claimMessage)`
+         (guild_id, type_key, display_name, department, channel_prefix, open_message, claim_message, option_description)
+       VALUES (@guildId, @typeKey, @displayName, @department, @channelPrefix, @openMessage, @claimMessage, @optionDescription)`
     )
     .run(seed);
   return getTicketTypeById(info.lastInsertRowid as number)!;
@@ -74,6 +75,14 @@ export function setClaimMessage(guildId: string, typeKey: string, message: strin
   const info = db
     .prepare(`UPDATE ticket_configs SET claim_message = ? WHERE guild_id = ? AND type_key = ?`)
     .run(message, guildId, typeKey);
+  return info.changes > 0;
+}
+
+/** The blurb shown under a ticket type's label in the panel's dropdown. */
+export function setOptionDescription(guildId: string, typeKey: string, description: string): boolean {
+  const info = db
+    .prepare(`UPDATE ticket_configs SET option_description = ? WHERE guild_id = ? AND type_key = ?`)
+    .run(description, guildId, typeKey);
   return info.changes > 0;
 }
 

@@ -50,14 +50,25 @@ on the ticket message, not slash commands** (`ticket-claim.ts`/
 `src/handlers/ticketHandler.ts` instead). This matches the described lifecycle
 ("a lead clicks a Claim button") more directly than a typed command would.
 
+Text-heavy config (open/claim messages, dropdown blurbs, panel title/
+description) is edited via **modals**, not slash-command string options —
+Discord's slash-command text input is a single-line box with no line breaks,
+which is painful for anything longer than a few words. `/ticket-config
+open-message type:application`, for example, takes no text argument at all;
+it just opens a modal pre-filled with the current message, ready to edit and
+resubmit.
+
 ## Ticket type config fields
 
 Each row in `ticket_configs` (see `src/db/connect.ts` for the schema) has:
 `typeKey`, `displayName`, `department`, `channelPrefix`, `reviewChannelId`,
-`openMessage`, `claimMessage`. Leads are a separate `ticket_leads` table
-(many-to-many by `type_key` + user ID). `openMessage`/`claimMessage` support
-`{department}`, `{leads}`, `{creator}`, `{claimant}` template variables,
-resolved at send time (`src/utils/ticketFormatter.ts`).
+`openMessage`, `claimMessage`, `optionDescription`. Leads are a separate
+`ticket_leads` table (many-to-many by `type_key` + user ID).
+`openMessage`/`claimMessage` support `{department}`, `{leads}`, `{creator}`,
+`{claimant}` template variables, resolved at send time
+(`src/utils/ticketFormatter.ts`). `optionDescription` is the short blurb shown
+under a type's label in the ticket panel's dropdown (e.g. "Apply to join the
+staff team.") — falls back to `department` if not set.
 
 ## Commands
 
@@ -80,20 +91,23 @@ resolved at send time (`src/utils/ticketFormatter.ts`).
   channel, and live open/claimed/closed counts.
 - `/ticket-config review-channel type:<autocomplete> channel:<channel>` —
   (re)point a ticket type's review/archive channel.
-- `/ticket-config open-message type:<autocomplete> message:<text>` /
-  `/ticket-config claim-message type:<autocomplete> message:<text>` — edit a
-  ticket type's message templates at runtime. Takes effect on the next
-  ticket immediately, no restart.
+- `/ticket-config open-message type:<autocomplete>` /
+  `claim-message type:<autocomplete>` / `option-description type:<autocomplete>`
+  — each opens a modal pre-filled with the current text so you can edit it as
+  proper multi-line text instead of a cramped single-line command option.
+  Saves take effect immediately, no restart. `option-description` is the
+  blurb shown under that type in the panel's dropdown.
 - `/ticket-panel post channel:<channel>` — post the ticket creation panel
-  (embed + select menu, one option per configured ticket type) in a channel.
+  (embed + select menu, one option per configured ticket type, each showing
+  its `option-description` as the dropdown's sub-text) in a channel.
   Re-running it (even in a different channel) edits the existing panel
   message in place rather than leaving duplicates behind — the panel's
   channel/message ID is tracked in `guild_settings`. Run this again any time
   ticket types change, so the dropdown reflects the current list.
-- `/ticket-panel customize title:<text> description:<text> reset:<bool>` —
-  change the panel embed's title/description (use `{types}` in the
-  description to insert the ticket type list) or `reset:true` to go back to
-  defaults. If a panel is already posted, it's refreshed live immediately.
+- `/ticket-panel customize` — opens a modal pre-filled with the panel's
+  current title/description (use `{types}` in the description to insert the
+  type list). Leaving a field blank resets it to the default. If a panel is
+  already posted, it's refreshed live immediately.
 - `/mod-config log-channel channel:<channel>` — set the moderation log
   channel.
 

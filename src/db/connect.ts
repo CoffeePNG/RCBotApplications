@@ -32,6 +32,7 @@ db.exec(`
     review_channel_id TEXT,
     open_message TEXT NOT NULL,
     claim_message TEXT NOT NULL,
+    option_description TEXT,
     UNIQUE (guild_id, type_key)
   );
 
@@ -84,3 +85,4 @@ ensureColumn("guild_settings", "panel_channel_id", "TEXT");
 ensureColumn("guild_settings", "panel_message_id", "TEXT");
 ensureColumn("guild_settings", "panel_title", "TEXT");
 ensureColumn("guild_settings", "panel_description", "TEXT");
+ensureColumn("ticket_configs", "option_description", "TEXT");

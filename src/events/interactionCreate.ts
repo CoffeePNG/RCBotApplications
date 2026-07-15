@@ -1,6 +1,12 @@
 import { Interaction, MessageFlags } from "discord.js";
 import { Command } from "../commands/types";
 import {
+  CONFIG_EDIT_MODAL_PREFIX,
+  PANEL_EDIT_MODAL_ID,
+  handleConfigEditModalSubmit,
+  handlePanelEditModalSubmit,
+} from "../handlers/configHandler";
+import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_CANCEL_PREFIX,
   TICKET_CLOSE_CONFIRM_PREFIX,
@@ -39,6 +45,10 @@ export async function handleInteraction(
     if (interaction.isModalSubmit()) {
       if (interaction.customId.startsWith(TICKET_CREATE_MODAL_PREFIX)) {
         await handleTicketCreateModal(interaction);
+      } else if (interaction.customId.startsWith(CONFIG_EDIT_MODAL_PREFIX)) {
+        await handleConfigEditModalSubmit(interaction);
+      } else if (interaction.customId === PANEL_EDIT_MODAL_ID) {
+        await handlePanelEditModalSubmit(interaction);
       }
       return;
     }

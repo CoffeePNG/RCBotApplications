@@ -6,14 +6,12 @@ import {
   SlashCommandBuilder,
   MessageFlags,
 } from "discord.js";
-import {
-  getTicketType,
-  setClaimMessage,
-  setOpenMessage,
-  setReviewChannel,
-} from "../../db/ticketConfigRepo";
+import { getTicketType, setReviewChannel } from "../../db/ticketConfigRepo";
+import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
 import { Command } from "../types";
+
+const TYPE_OPTION_DESCRIPTION = "The ticket type to configure";
 
 export const ticketConfigCommand: Command = {
   data: new SlashCommandBuilder()
@@ -25,7 +23,7 @@ export const ticketConfigCommand: Command = {
         .setName("review-channel")
         .setDescription("Set the channel a ticket type's new-ticket notices and transcripts go to.")
         .addStringOption((opt) =>
-          opt.setName("type").setDescription("The ticket type to configure").setRequired(true).setAutocomplete(true)
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
         )
         .addChannelOption((opt) =>
           opt
@@ -38,31 +36,25 @@ export const ticketConfigCommand: Command = {
     .addSubcommand((sub) =>
       sub
         .setName("open-message")
-        .setDescription("Set the message posted when a ticket of this type opens.")
+        .setDescription("Edit the message posted when a ticket of this type opens.")
         .addStringOption((opt) =>
-          opt.setName("type").setDescription("The ticket type to configure").setRequired(true).setAutocomplete(true)
-        )
-        .addStringOption((opt) =>
-          opt
-            .setName("message")
-            .setDescription("Supports {department}, {leads}, {creator}")
-            .setRequired(true)
-            .setMaxLength(1000)
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName("claim-message")
-        .setDescription("Set the message posted when a ticket of this type is claimed.")
+        .setDescription("Edit the message posted when a ticket of this type is claimed.")
         .addStringOption((opt) =>
-          opt.setName("type").setDescription("The ticket type to configure").setRequired(true).setAutocomplete(true)
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("option-description")
+        .setDescription("Edit the blurb shown under this type in the ticket panel dropdown.")
         .addStringOption((opt) =>
-          opt
-            .setName("message")
-            .setDescription("Supports {claimant}, {creator}, {department}")
-            .setRequired(true)
-            .setMaxLength(1000)
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
         )
     ),
 
@@ -98,23 +90,16 @@ export const ticketConfigCommand: Command = {
       return;
     }
 
-    if (sub === "open-message") {
-      const message = interaction.options.getString("message", true);
-      setOpenMessage(guildId, typeKey, message);
-      await interaction.reply({
-        content: `Open message for **${ticketType.displayName}** updated. New tickets will use it right away.`,
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    if (sub === "claim-message") {
-      const message = interaction.options.getString("message", true);
-      setClaimMessage(guildId, typeKey, message);
-      await interaction.reply({
-        content: `Claim message for **${ticketType.displayName}** updated.`,
-        flags: MessageFlags.Ephemeral,
-      });
+    // open-message, claim-message, and option-description all edit multi-line/long text,
+    // so they're edited via a pre-filled modal rather than a slash-command option.
+    const fieldBySubcommand: Record<string, ConfigField> = {
+      "open-message": "open",
+      "claim-message": "claim",
+      "option-description": "optdesc",
+    };
+    const field = fieldBySubcommand[sub];
+    if (field) {
+      await interaction.showModal(buildConfigEditModal(field, ticketType));
     }
   },
 

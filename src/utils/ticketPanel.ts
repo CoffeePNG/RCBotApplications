@@ -23,11 +23,11 @@ export function buildPanelContent(guildId: string): PanelContent | null {
   if (types.length === 0) return null;
 
   const settings = getGuildSettings(guildId);
-  const typeList = types.map((t) => `**${t.displayName}** — ${t.department}`).join("\n");
+  const typeList = types.map((t) => `**${t.displayName}** — ${t.optionDescription ?? t.department}`).join("\n");
 
   const description = settings.panelDescription
     ? resolveTemplate(settings.panelDescription, { types: typeList })
-    : `${typeList}\n\nSelect a category below to get started.`;
+    : "Select a category below to get started.";
 
   const embed = new EmbedBuilder()
     .setTitle((settings.panelTitle ?? DEFAULT_TITLE).slice(0, 256))
@@ -41,7 +41,7 @@ export function buildPanelContent(guildId: string): PanelContent | null {
       types.map((t) => ({
         label: t.displayName,
         value: t.typeKey,
-        description: t.department.slice(0, 100),
+        description: (t.optionDescription ?? t.department).slice(0, 100),
       }))
     );
 
