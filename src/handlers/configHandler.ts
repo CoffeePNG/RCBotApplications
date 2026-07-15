@@ -116,7 +116,8 @@ export function buildPanelEditModal(guildId: string): ModalBuilder {
 
   const description = new TextInputBuilder()
     .setCustomId("description")
-    .setLabel("Description (blank = default). {types} inserts the list")
+    .setLabel("Description (blank = default)")
+    .setPlaceholder("Use {types} to insert the ticket type list")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(false)
     .setMaxLength(3800);
