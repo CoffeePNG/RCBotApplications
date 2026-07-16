@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  User,
 } from "discord.js";
 import {
   TICKET_CLAIM_PREFIX,
@@ -40,13 +41,17 @@ export function buildTicketEmbed(
   ticket: Ticket,
   ticketType: TicketTypeConfig,
   details: string,
-  creatorTag: string
+  creator: User,
+  openMessage: string
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(ticketType.displayName)
-    .setDescription(`**Here is the user's response:**\n${details.slice(0, 3900)}`)
-    .addFields({ name: "Opened by", value: `${creatorTag} (<@${ticket.creatorId}>)` })
-    .setFooter({ text: `Ticket #${ticket.id} • ${ticketType.department}` })
+    .setDescription(openMessage.slice(0, 2000))
+    .addFields({ name: "Response", value: details.trim().slice(0, 1024) || "*(no response provided)*" })
+    .setFooter({
+      text: `${creator.username} (${creator.id}) • Ticket #${ticket.id}`,
+      iconURL: creator.displayAvatarURL(),
+    })
     .setTimestamp(ticket.createdAt);
 
   return applyTicketStatus(embed, ticket);

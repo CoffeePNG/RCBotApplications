@@ -125,11 +125,13 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     leads: formatLeadsMention(leads),
     creator: `<@${interaction.user.id}>`,
   });
-  const pingLine = leads.length > 0 ? leads.map((id) => `<@${id}>`).join(" ") : null;
+  // Leads are pinged in the message body (embeds don't fire notifications); the
+  // welcome text and the applicant's response live inside the embed itself.
+  const pingLine = leads.length > 0 ? leads.map((id) => `<@${id}>`).join(" ") : undefined;
 
   const message = await channel.send({
-    content: [pingLine, openMessage].filter(Boolean).join("\n"),
-    embeds: [buildTicketEmbed(ticket, ticketType, details, interaction.user.tag)],
+    content: pingLine,
+    embeds: [buildTicketEmbed(ticket, ticketType, details, interaction.user, openMessage)],
     components: [buildTicketButtons(ticket.id, false, false)],
   });
   setMessageId(ticket.id, message.id);
