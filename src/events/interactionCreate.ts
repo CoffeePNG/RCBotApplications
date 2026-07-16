@@ -8,8 +8,7 @@ import {
 } from "../handlers/configHandler";
 import {
   TICKET_CLAIM_PREFIX,
-  TICKET_CLOSE_CANCEL_PREFIX,
-  TICKET_CLOSE_CONFIRM_PREFIX,
+  TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_PANEL_SELECT_ID,
@@ -18,8 +17,7 @@ import {
 } from "../handlers/ticketConstants";
 import {
   handleTicketClaim,
-  handleTicketCloseCancel,
-  handleTicketCloseConfirm,
+  handleTicketCloseModalSubmit,
   handleTicketCloseRequest,
   handleTicketCreateModal,
   handleTicketPanelSelect,
@@ -71,7 +69,9 @@ export async function handleInteraction(
     }
 
     if (interaction.isModalSubmit()) {
-      if (interaction.customId.startsWith(TICKET_CREATE_MODAL_PREFIX)) {
+      if (interaction.customId.startsWith(TICKET_CLOSE_MODAL_PREFIX)) {
+        await handleTicketCloseModalSubmit(interaction);
+      } else if (interaction.customId.startsWith(TICKET_CREATE_MODAL_PREFIX)) {
         await handleTicketCreateModal(interaction);
       } else if (interaction.customId.startsWith(CONFIG_EDIT_MODAL_PREFIX)) {
         await handleConfigEditModalSubmit(interaction);
@@ -96,11 +96,7 @@ export async function handleInteraction(
     }
 
     if (interaction.isButton()) {
-      if (interaction.customId.startsWith(TICKET_CLOSE_CONFIRM_PREFIX)) {
-        await handleTicketCloseConfirm(interaction);
-      } else if (interaction.customId.startsWith(TICKET_CLOSE_CANCEL_PREFIX)) {
-        await handleTicketCloseCancel(interaction);
-      } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
+      if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseRequest(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaim(interaction);

@@ -7,8 +7,6 @@ import {
 } from "discord.js";
 import {
   TICKET_CLAIM_PREFIX,
-  TICKET_CLOSE_CANCEL_PREFIX,
-  TICKET_CLOSE_CONFIRM_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
@@ -107,20 +105,6 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
   return row;
 }
 
-/** Confirm/Cancel buttons shown on the ephemeral "are you sure?" close prompt. */
-export function buildCloseConfirmRow(ticketId: number): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`${TICKET_CLOSE_CONFIRM_PREFIX}${ticketId}`)
-      .setLabel("Confirm Close")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId(`${TICKET_CLOSE_CANCEL_PREFIX}${ticketId}`)
-      .setLabel("Cancel")
-      .setStyle(ButtonStyle.Secondary)
-  );
-}
-
 function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60000);
   if (minutes < 60) return `${minutes}m`;
@@ -142,7 +126,7 @@ export function buildTranscriptLogEmbed(
       : "*no messages*";
 
   const reference = ticket.code ?? `Ticket #${ticket.id}`;
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle(`${ticketType.displayName} — ${reference}`)
     .setColor(0x99aab5)
     .addFields(
@@ -157,12 +141,19 @@ export function buildTranscriptLogEmbed(
         value: ticket.closedBy ? `<@${ticket.closedBy}>` : "*unknown*",
         inline: true,
       },
+      { name: "Outcome", value: ticket.outcome ?? "*none*", inline: true },
       {
         name: "Duration",
         value: ticket.closedAt != null ? formatDuration(ticket.closedAt - ticket.createdAt) : "unknown",
-      },
-      { name: "Messages", value: participantSummary.slice(0, 1024) }
-    )
+        inline: true,
+      }
+    );
+
+  if (ticket.closeReason) {
+    embed.addFields({ name: "Reason", value: ticket.closeReason.slice(0, 1024) });
+  }
+  embed.addFields({ name: "Messages", value: participantSummary.slice(0, 1024) });
+  return embed
     .setFooter({ text: `${ticketType.typeKey} • ${reference}` })
     .setTimestamp(ticket.closedAt ?? Date.now());
 }

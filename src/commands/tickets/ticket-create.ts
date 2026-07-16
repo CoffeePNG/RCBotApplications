@@ -14,7 +14,8 @@ import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplet
 import { buildTicketDetailsModal } from "../../utils/ticketModal";
 import { grantChannelAccess, revokeChannelAccess } from "../../utils/ticketPermissions";
 import { applyClaimChange } from "../../utils/claimActions";
-import { canAssign, canManageParticipants, canUnclaim, hasResidualTicketAccess } from "../../utils/ticketAuth";
+import { retryTicketArchive } from "../../handlers/ticketHandler";
+import { canAssign, canClose, canManageParticipants, canUnclaim, hasResidualTicketAccess } from "../../utils/ticketAuth";
 import { Command } from "../types";
 
 export const ticketCreateCommand: Command = {
@@ -53,6 +54,11 @@ export const ticketCreateCommand: Command = {
         .setName("assign")
         .setDescription("Assign this ticket to a specific staff member.")
         .addUserOption((opt) => opt.setName("user").setDescription("The staff member to assign").setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("archive-retry")
+        .setDescription("Retry archiving a ticket whose transcript failed to save on close.")
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -68,6 +74,7 @@ export const ticketCreateCommand: Command = {
     const sub = interaction.options.getSubcommand();
     if (sub === "create") return handleCreate(interaction, guildId);
     if (sub === "unclaim" || sub === "assign") return handleClaimChange(interaction, guildId, sub);
+    if (sub === "archive-retry") return handleArchiveRetry(interaction, guildId);
     return handleParticipant(interaction, guildId, sub);
   },
 
@@ -252,4 +259,37 @@ async function handleClaimChange(
   }
   await applyClaimChange(interaction.client, ticket, ticketType, target.id, interaction.user.id, "assign");
   await interaction.reply({ content: `Assigned this ticket to ${target.tag}.`, flags: MessageFlags.Ephemeral });
+}
+
+async function handleArchiveRetry(interaction: ChatInputCommandInteraction, guildId: string): Promise<void> {
+  const channel = interaction.channel;
+  const ticket = channel ? getTicketByChannel(channel.id) : null;
+  if (!ticket) {
+    await interaction.reply({ content: "Run this inside a ticket channel.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const ticketType = getTicketType(guildId, ticket.typeKey);
+  if (!ticketType) {
+    await interaction.reply({ content: "This ticket's type no longer exists.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (ticket.status !== "closing" && ticket.status !== "closing_failed") {
+    await interaction.reply({
+      content: "This ticket isn't waiting on an archive retry.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  if (!canClose({ userId: interaction.user.id, permissions: interaction.memberPermissions, ticket, ticketType })) {
+    await interaction.reply({ content: "You don't have permission to do that.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!(channel instanceof TextChannel)) {
+    await interaction.reply({ content: "This channel is unavailable.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const result = await retryTicketArchive(interaction.client, ticket, ticketType, channel);
+  await interaction.editReply({ content: result.message });
 }

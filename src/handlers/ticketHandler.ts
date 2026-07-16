@@ -1,5 +1,4 @@
 import {
-  AttachmentBuilder,
   ButtonInteraction,
   ChannelType,
   EmbedBuilder,
@@ -15,9 +14,10 @@ import { getGuildSettings } from "../db/guildSettingsRepo";
 import { getManagers } from "../db/managerRepo";
 import {
   claimTicket,
-  closeTicket,
   createTicket,
   getTicketById,
+  markClosed,
+  markClosing,
   setChannelId,
   setMessageId,
 } from "../db/ticketRepo";
@@ -27,20 +27,25 @@ import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
-  buildCloseConfirmRow,
   buildTicketButtons,
   buildTicketEmbed,
-  buildTranscriptLogEmbed,
 } from "../utils/ticketEmbeds";
-import { buildTicketDetailsModal, questionFieldId } from "../utils/ticketModal";
+import {
+  CLOSE_OUTCOME_FIELD,
+  CLOSE_REASON_FIELD,
+  buildCloseModal,
+  buildTicketDetailsModal,
+  questionFieldId,
+} from "../utils/ticketModal";
+import { parseOutcome } from "../utils/closeOutcomes";
 import { canClaim, canClose, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
-import { generateTranscript } from "../utils/transcript";
+import { archiveTicket, lockTicketChannel } from "../utils/ticketClosure";
+import { updateTicketMessage } from "../utils/ticketMessage";
 import {
   TICKET_CLAIM_PREFIX,
-  TICKET_CLOSE_CANCEL_PREFIX,
-  TICKET_CLOSE_CONFIRM_PREFIX,
+  TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_TAKEOVER_PREFIX,
@@ -49,8 +54,7 @@ import {
 
 export {
   TICKET_CLAIM_PREFIX,
-  TICKET_CLOSE_CANCEL_PREFIX,
-  TICKET_CLOSE_CONFIRM_PREFIX,
+  TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_TAKEOVER_PREFIX,
@@ -370,7 +374,7 @@ export async function handleTicketTakeover(interaction: ButtonInteraction) {
   await applyClaimChange(interaction.client, ticket, ticketType, interaction.user.id, interaction.user.id, "takeover");
 }
 
-/** Close button, step 1: asks for confirmation before anything happens. */
+/** Close button: opens the structured close modal (outcome + optional reason). */
 export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
   const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_PREFIX.length));
   const found = resolveTicketAndType(ticketId);
@@ -383,8 +387,8 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
   }
   const { ticket, ticketType } = found;
 
-  if (ticket.status === "closed") {
-    await interaction.reply({ content: "This ticket is already closed.", flags: MessageFlags.Ephemeral });
+  if (ticket.status === "closed" || ticket.status === "closing") {
+    await interaction.reply({ content: "This ticket is already being closed.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -396,96 +400,123 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
     return;
   }
 
-  await interaction.reply({
-    content: "Are you sure you want to close this ticket? This can't be undone.",
-    components: [buildCloseConfirmRow(ticketId)],
-    flags: MessageFlags.Ephemeral,
-  });
+  await interaction.showModal(buildCloseModal(ticketId));
 }
 
-/** Close confirmation, "Cancel": dismisses the ephemeral prompt, ticket stays open. */
-export async function handleTicketCloseCancel(interaction: ButtonInteraction) {
-  await interaction.update({ content: "Close cancelled.", components: [] });
-}
-
-/** Close confirmation, "Confirm": archives the transcript, marks closed, deletes the channel. */
-export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
-  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_CONFIRM_PREFIX.length));
+/** Close modal submit: locks, archives (verified), then closes and deletes only on success. */
+export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_MODAL_PREFIX.length));
   const found = resolveTicketAndType(ticketId);
   if (!found) {
-    await interaction.update({ content: "Ticket not found or its type is no longer configured.", components: [] });
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
     return;
   }
   const { ticket, ticketType } = found;
 
-  if (ticket.status === "closed") {
-    await interaction.update({ content: "This ticket is already closed.", components: [] });
-    return;
-  }
-
-  if (!canClose(authCtx(interaction, ticket, ticketType))) {
-    await interaction.update({ content: "You don't have permission to close this ticket.", components: [] });
+  if (ticket.status === "closed" || ticket.status === "closing") {
+    await interaction.reply({ content: "This ticket is already being closed.", flags: MessageFlags.Ephemeral });
     return;
   }
 
   const channel = interaction.channel;
-  if (!(channel instanceof TextChannel)) return;
-
-  const transcript = await generateTranscript(channel);
-  const closed = closeTicket(ticketId, interaction.user.id);
-  if (!closed) return;
-
-  if (ticketType.reviewChannelId) {
-    const reviewChannel = await interaction.client.channels
-      .fetch(ticketType.reviewChannelId)
-      .catch(() => null);
-    if (reviewChannel instanceof TextChannel) {
-      // Summary embed first, then the transcript code block + full-text file underneath it.
-      await reviewChannel.send({
-        embeds: [buildTranscriptLogEmbed(closed, ticketType, transcript.participants)],
-      });
-      const attachment = new AttachmentBuilder(Buffer.from(transcript.text, "utf-8"), {
-        name: `${closed.code ?? `ticket-${ticketId}`}-transcript.txt`,
-      });
-      await reviewChannel.send({
-        content: buildTranscriptCodeBlock(transcript.text),
-        files: [attachment],
-      });
-    }
+  if (!(channel instanceof TextChannel)) {
+    await interaction.reply({ content: "This ticket's channel is unavailable.", flags: MessageFlags.Ephemeral });
+    return;
   }
 
-  if (closed.messageId) {
-    const originalMessage = await channel.messages.fetch(closed.messageId).catch(() => null);
-    if (originalMessage) {
-      const baseEmbed = originalMessage.embeds[0]
-        ? EmbedBuilder.from(originalMessage.embeds[0])
-        : new EmbedBuilder();
-      await originalMessage
-        .edit({
-          embeds: [applyTicketStatus(baseEmbed, closed)],
-          components: [buildTicketButtons(closed)],
-        })
-        .catch(() => null);
-    }
-  }
+  const outcome = parseOutcome(safeField(interaction, CLOSE_OUTCOME_FIELD));
+  const reason = safeField(interaction, CLOSE_REASON_FIELD).trim() || null;
 
-  // Public notice everyone in the ticket channel can see, before the channel is removed.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const closing = markClosing(ticketId, interaction.user.id, reason, outcome);
+  if (!closing) {
+    await interaction.editReply({ content: "Couldn't start closing this ticket." });
+    return;
+  }
+  recordAudit({
+    guildId: closing.guildId,
+    ticketId: closing.id,
+    ticketCode: closing.code ?? undefined,
+    actorId: interaction.user.id,
+    eventType: "close_initiated",
+    newValue: outcome ?? undefined,
+  });
+
+  // Freeze the channel so no messages arrive between transcript capture and deletion.
+  await lockTicketChannel(channel, closing.creatorId);
   await channel
-    .send(`This ticket has been closed by <@${interaction.user.id}>. It will close in 5 seconds.`)
+    .send(`This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}.`)
     .catch(() => null);
 
-  await interaction.update({ content: "Closing ticket…", components: [] });
-
-  setTimeout(() => channel.delete().catch(() => null), 5000);
+  const result = await finalizeClose(interaction.client, closing, ticketType, channel);
+  await interaction.editReply({ content: result.message });
 }
 
-// Discord message content caps at 2000 chars; leave room for the code fences.
-const CODE_BLOCK_LIMIT = 1900;
+interface CloseResult {
+  message: string;
+}
 
-function buildTranscriptCodeBlock(text: string): string {
-  const body =
-    text.length > CODE_BLOCK_LIMIT
-      ? `${text.slice(0, CODE_BLOCK_LIMIT)}\n… (truncated — see attached file for the full transcript)`
-      : text;
-  return `\`\`\`\n${body}\n\`\`\``;
+/**
+ * Archives the ticket (verified) and, only on success, marks it closed and deletes
+ * the channel after a short grace period. On failure the channel is left intact and
+ * the ticket sits in 'closing_failed' for `/ticket archive-retry`.
+ */
+async function finalizeClose(
+  client: TextChannel["client"],
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  channel: TextChannel
+): Promise<CloseResult> {
+  const archive = await archiveTicket(client, ticket, ticketType, channel);
+
+  if (!archive.ok) {
+    await updateTicketMessage(client, getTicketById(ticket.id) ?? ticket, ticketType);
+    await channel
+      .send(
+        "⚠️ I couldn't archive this ticket's transcript, so the channel is being kept open. " +
+          "A staff member can retry with `/ticket archive-retry`."
+      )
+      .catch(() => null);
+    return {
+      message: `Archiving failed (${archive.error ?? "unknown error"}). The channel was kept — run \`/ticket archive-retry\` here to try again.`,
+    };
+  }
+
+  const closed = markClosed(ticket.id);
+  recordAudit({
+    guildId: ticket.guildId,
+    ticketId: ticket.id,
+    ticketCode: ticket.code ?? undefined,
+    actorId: ticket.closedBy ?? undefined,
+    eventType: "ticket_closed",
+  });
+  await updateTicketMessage(client, closed ?? ticket, ticketType);
+
+  await channel.send("Transcript archived. This channel will be deleted in 5 seconds.").catch(() => null);
+  setTimeout(() => channel.delete().catch(() => null), 5000);
+
+  return {
+    message: archive.noTarget
+      ? "Ticket closed. (No archive channel is configured, so no transcript was saved.)"
+      : "Ticket closed and transcript archived. The channel will be deleted shortly.",
+  };
+}
+
+/** Re-attempts archiving for a ticket stuck in closing / closing_failed, then deletes on success. */
+export async function retryTicketArchive(
+  client: TextChannel["client"],
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  channel: TextChannel
+): Promise<CloseResult> {
+  return finalizeClose(client, ticket, ticketType, channel);
+}
+
+function safeField(interaction: ModalSubmitInteraction, fieldId: string): string {
+  try {
+    return interaction.fields.getTextInputValue(fieldId);
+  } catch {
+    return "";
+  }
 }

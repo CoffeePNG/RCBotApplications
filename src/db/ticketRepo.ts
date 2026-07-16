@@ -144,14 +144,6 @@ export function markClosed(id: number): Ticket | null {
   return getTicketById(id);
 }
 
-/** Legacy one-shot close (kept until the structured close flow replaces the caller). */
-export function closeTicket(id: number, userId: string): Ticket | null {
-  db.prepare(
-    `UPDATE tickets SET status = 'closed', closed_by = ?, closed_at = ? WHERE id = ?`
-  ).run(userId, Date.now(), id);
-  return getTicketById(id);
-}
-
 export function getOpenTicketsByType(guildId: string, typeKey: string): Ticket[] {
   const rows = db
     .prepare(
