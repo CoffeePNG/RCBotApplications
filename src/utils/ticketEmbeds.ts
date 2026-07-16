@@ -12,8 +12,7 @@ import {
 } from "../handlers/ticketConstants";
 import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
-
-const TRANSCRIPT_PREVIEW_LIMIT = 3800;
+import { ParticipantCount } from "./transcript";
 
 function statusColor(status: Ticket["status"]): number {
   if (status === "claimed") return 0xfee75c;
@@ -96,21 +95,20 @@ function formatDuration(ms: number): string {
   return `${days}d ${hours % 24}h`;
 }
 
-/** Builds one archive-channel embed per closed ticket; transcript is plain text (not a code block) so mentions still resolve. */
+/** The archive-channel summary embed for a closed ticket: who was involved and a per-person message count, no transcript text. */
 export function buildTranscriptLogEmbed(
   ticket: Ticket,
   ticketType: TicketTypeConfig,
-  transcriptText: string
+  participants: ParticipantCount[]
 ): EmbedBuilder {
-  const preview =
-    transcriptText.length > TRANSCRIPT_PREVIEW_LIMIT
-      ? `${transcriptText.slice(0, TRANSCRIPT_PREVIEW_LIMIT)}\n… *(truncated, see attached file for the full transcript)*`
-      : transcriptText;
+  const participantSummary =
+    participants.length > 0
+      ? participants.map((p) => `${p.tag} — ${p.count} message${p.count === 1 ? "" : "s"}`).join("\n")
+      : "*no messages*";
 
   return new EmbedBuilder()
     .setTitle(`${ticketType.displayName} — Ticket #${ticket.id}`)
     .setColor(0x99aab5)
-    .setDescription(preview || "*(no messages)*")
     .addFields(
       { name: "Opened by", value: `<@${ticket.creatorId}>`, inline: true },
       {
@@ -126,7 +124,8 @@ export function buildTranscriptLogEmbed(
       {
         name: "Duration",
         value: ticket.closedAt != null ? formatDuration(ticket.closedAt - ticket.createdAt) : "unknown",
-      }
+      },
+      { name: "Messages", value: participantSummary.slice(0, 1024) }
     )
     .setFooter({ text: `${ticketType.typeKey} • ticket #${ticket.id}` })
     .setTimestamp(ticket.closedAt ?? Date.now());

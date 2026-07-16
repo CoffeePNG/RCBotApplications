@@ -13,7 +13,14 @@ process.on("uncaughtException", (error) => {
 });
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  // GuildMessages + MessageContent are required to read what users typed for the
+  // ticket transcript. MessageContent is a privileged intent — it must also be
+  // enabled in the Discord Developer Portal (Bot → Privileged Gateway Intents).
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 const commandsByName = new Map(commands.map((command) => [command.data.name, command]));

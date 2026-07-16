@@ -7,8 +7,19 @@ interface TranscriptLine {
   attachments: string;
 }
 
-export async function generateTranscript(channel: TextChannel, limit = 500): Promise<string> {
+export interface ParticipantCount {
+  tag: string;
+  count: number;
+}
+
+export interface Transcript {
+  text: string;
+  participants: ParticipantCount[];
+}
+
+export async function generateTranscript(channel: TextChannel, limit = 500): Promise<Transcript> {
   const messages: TranscriptLine[] = [];
+  const counts = new Map<string, number>();
   let before: string | undefined;
 
   while (messages.length < limit) {
@@ -24,6 +35,10 @@ export async function generateTranscript(channel: TextChannel, limit = 500): Pro
         content: msg.content,
         attachments: msg.attachments.map((a) => a.url).join(" "),
       });
+      // Count human messages only, so the summary reflects who actually talked.
+      if (!msg.author.bot) {
+        counts.set(msg.author.tag, (counts.get(msg.author.tag) ?? 0) + 1);
+      }
       if (msg.createdTimestamp < oldestTimestamp) {
         oldestTimestamp = msg.createdTimestamp;
         oldestId = msg.id;
@@ -40,5 +55,13 @@ export async function generateTranscript(channel: TextChannel, limit = 500): Pro
         m.attachments ? ` ${m.attachments}` : ""
       }`
   );
-  return lines.join("\n") || "(no messages)";
+
+  const participants = [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    text: lines.join("\n") || "(no messages)",
+    participants,
+  };
 }

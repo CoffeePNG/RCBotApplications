@@ -16,8 +16,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     displayName: "Staff Application",
     department: "leadership",
     channelPrefix: "application",
-    openMessage:
-      "Thanks for applying! This is your staff application ticket for **{department}**.\n{leads}\n\nA lead will review your application and follow up here.",
+    openMessage: "Thanks for applying! A member of the team will be with you shortly.",
     claimMessage: "{claimant} has claimed this application and will be reviewing it.",
     optionDescription: "Apply to join the staff team.",
   },
@@ -27,7 +26,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     department: "development",
     channelPrefix: "bug",
     openMessage:
-      "Thanks for the report! This ticket is routed to **{department}**.\n{leads}\n\nPlease include steps to reproduce, and screenshots/logs if you have them.",
+      "Thanks for the report! A member of the team will be with you shortly. Please include steps to reproduce, plus any screenshots or logs.",
     claimMessage: "{claimant} has claimed this bug report and is looking into it.",
     optionDescription: "Report a bug or glitch you've run into.",
   },
@@ -37,7 +36,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     department: "moderation",
     channelPrefix: "appeal",
     openMessage:
-      "This is your appeal ticket, routed to **{department}**.\n{leads}\n\nPlease explain what you're appealing and why.",
+      "Thanks — a member of the team will review your appeal shortly. Please explain what you're appealing and why.",
     claimMessage: "{claimant} has claimed this appeal and will be reviewing it.",
     optionDescription: "Appeal a ban, mute, or other moderation action.",
   },
@@ -47,7 +46,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     department: "support",
     channelPrefix: "help",
     openMessage:
-      "This is your help request, routed to **{department}**.\n{leads}\n\nDescribe what you need help with and someone will be with you shortly.",
+      "Thanks for reaching out! A member of the team will be with you shortly. Describe what you need help with.",
     claimMessage: "{claimant} has claimed this help request.",
     optionDescription: "Get help with anything else.",
   },

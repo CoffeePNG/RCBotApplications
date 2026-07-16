@@ -280,7 +280,7 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
   const channel = interaction.channel;
   if (!(channel instanceof TextChannel)) return;
 
-  const transcriptText = await generateTranscript(channel);
+  const transcript = await generateTranscript(channel);
   const closed = closeTicket(ticketId, interaction.user.id);
   if (!closed) return;
 
@@ -289,11 +289,15 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
       .fetch(ticketType.reviewChannelId)
       .catch(() => null);
     if (reviewChannel instanceof TextChannel) {
-      const attachment = new AttachmentBuilder(Buffer.from(transcriptText, "utf-8"), {
+      // Summary embed first, then the transcript code block + full-text file underneath it.
+      await reviewChannel.send({
+        embeds: [buildTranscriptLogEmbed(closed, ticketType, transcript.participants)],
+      });
+      const attachment = new AttachmentBuilder(Buffer.from(transcript.text, "utf-8"), {
         name: `ticket-${ticketId}-transcript.txt`,
       });
       await reviewChannel.send({
-        embeds: [buildTranscriptLogEmbed(closed, ticketType, transcriptText)],
+        content: buildTranscriptCodeBlock(transcript.text),
         files: [attachment],
       });
     }
@@ -314,10 +318,23 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
     }
   }
 
-  await interaction.update({
-    content: "This ticket is now closed. The channel will be deleted in 5 seconds.",
-    components: [],
-  });
+  // Public notice everyone in the ticket channel can see, before the channel is removed.
+  await channel
+    .send(`This ticket has been closed by <@${interaction.user.id}>. It will close in 5 seconds.`)
+    .catch(() => null);
+
+  await interaction.update({ content: "Closing ticket…", components: [] });
 
   setTimeout(() => channel.delete().catch(() => null), 5000);
+}
+
+// Discord message content caps at 2000 chars; leave room for the code fences.
+const CODE_BLOCK_LIMIT = 1900;
+
+function buildTranscriptCodeBlock(text: string): string {
+  const body =
+    text.length > CODE_BLOCK_LIMIT
+      ? `${text.slice(0, CODE_BLOCK_LIMIT)}\n… (truncated — see attached file for the full transcript)`
+      : text;
+  return `\`\`\`\n${body}\n\`\`\``;
 }
