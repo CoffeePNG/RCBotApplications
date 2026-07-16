@@ -12,7 +12,16 @@ export function getGuildSettings(guildId: string): GuildSettings {
     panelMessageId: row ? row.panel_message_id : null,
     panelTitle: row ? row.panel_title : null,
     panelDescription: row ? row.panel_description : null,
+    ticketCategoryId: row ? row.ticket_category_id : null,
   };
+}
+
+export function setTicketCategory(guildId: string, categoryId: string): void {
+  db.prepare(
+    `INSERT INTO guild_settings (guild_id, ticket_category_id)
+     VALUES (?, ?)
+     ON CONFLICT(guild_id) DO UPDATE SET ticket_category_id = excluded.ticket_category_id`
+  ).run(guildId, categoryId);
 }
 
 export function setModLogChannel(guildId: string, channelId: string): void {

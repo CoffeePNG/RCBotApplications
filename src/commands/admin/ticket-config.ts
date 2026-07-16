@@ -7,6 +7,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { getTicketType, setReviewChannel } from "../../db/ticketConfigRepo";
+import { setTicketCategory } from "../../db/guildSettingsRepo";
 import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
 import { Command } from "../types";
@@ -56,6 +57,18 @@ export const ticketConfigCommand: Command = {
         .addStringOption((opt) =>
           opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("category")
+        .setDescription("Set the category all new ticket channels are created under (applies to every type).")
+        .addChannelOption((opt) =>
+          opt
+            .setName("category")
+            .setDescription("The category channel")
+            .addChannelTypes(ChannelType.GuildCategory)
+            .setRequired(true)
+        )
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -63,6 +76,19 @@ export const ticketConfigCommand: Command = {
     if (!guildId) {
       await interaction.reply({
         content: "This command can only be used in a server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const sub = interaction.options.getSubcommand();
+
+    // `category` is a guild-wide setting, so it has no `type` option.
+    if (sub === "category") {
+      const category = interaction.options.getChannel("category", true);
+      setTicketCategory(guildId, category.id);
+      await interaction.reply({
+        content: `New tickets will now open under the **${category.name}** category.`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -77,8 +103,6 @@ export const ticketConfigCommand: Command = {
       });
       return;
     }
-
-    const sub = interaction.options.getSubcommand();
 
     if (sub === "review-channel") {
       const channel = interaction.options.getChannel("channel", true);

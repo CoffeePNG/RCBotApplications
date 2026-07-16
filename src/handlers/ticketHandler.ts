@@ -11,6 +11,7 @@ import {
   TextChannel,
 } from "discord.js";
 import { getLeads, getTicketType } from "../db/ticketConfigRepo";
+import { getGuildSettings } from "../db/guildSettingsRepo";
 import {
   claimTicket,
   closeTicket,
@@ -19,7 +20,7 @@ import {
   setChannelId,
   setMessageId,
 } from "../db/ticketRepo";
-import { buildChannelName, formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
+import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
   buildCloseConfirmRow,
@@ -79,9 +80,9 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   const details = interaction.fields.getTextInputValue("details");
   const leads = getLeads(ticketType.id);
 
-  // Reserve the ticket row first so its ID is known before the channel is
-  // named (channel names use the ticket ID as their suffix for easy lookup).
-  const ticket = createTicket(guildId, typeKey, interaction.user.id, "");
+  // Create the ticket row first so its unique code (used as the channel name) exists.
+  const ticket = createTicket(guildId, typeKey, interaction.user.id, ticketType.channelPrefix);
+  const channelName = ticket.code ?? `ticket-${ticket.id}`;
 
   const overwrites: OverwriteResolvable[] = [
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -113,11 +114,23 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     })),
   ];
 
-  const channel = await guild.channels.create({
-    name: buildChannelName(ticketType.channelPrefix, interaction.user.username, ticket.id),
-    type: ChannelType.GuildText,
-    permissionOverwrites: overwrites,
-  });
+  // Place the channel under the configured category if one is set; fall back to
+  // no category if it's been deleted so ticket creation still succeeds.
+  const categoryId = getGuildSettings(guildId).ticketCategoryId ?? undefined;
+  const channel = await guild.channels
+    .create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: categoryId,
+      permissionOverwrites: overwrites,
+    })
+    .catch(() =>
+      guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        permissionOverwrites: overwrites,
+      })
+    );
   setChannelId(ticket.id, channel.id);
 
   const openMessage = resolveTemplate(ticketType.openMessage, {
@@ -142,7 +155,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
       .catch(() => null);
     if (reviewChannel instanceof TextChannel) {
       await reviewChannel.send(
-        `New **${ticketType.displayName}** ticket opened by <@${interaction.user.id}>: <#${channel.id}>`
+        `New **${ticketType.displayName}** ticket \`${channelName}\` opened by <@${interaction.user.id}>: <#${channel.id}>`
       );
     }
   }
@@ -296,7 +309,7 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
         embeds: [buildTranscriptLogEmbed(closed, ticketType, transcript.participants)],
       });
       const attachment = new AttachmentBuilder(Buffer.from(transcript.text, "utf-8"), {
-        name: `ticket-${ticketId}-transcript.txt`,
+        name: `${closed.code ?? `ticket-${ticketId}`}-transcript.txt`,
       });
       await reviewChannel.send({
         content: buildTranscriptCodeBlock(transcript.text),

@@ -8,6 +8,7 @@ function rowToTicket(row: any): Ticket {
     typeKey: row.type_key,
     creatorId: row.creator_id,
     channelId: row.channel_id,
+    code: row.code,
     messageId: row.message_id,
     status: row.status,
     claimedBy: row.claimed_by,
@@ -18,18 +19,34 @@ function rowToTicket(row: any): Ticket {
   };
 }
 
+/** Builds a `<prefix>-<yyyymmdd>-<5 letters>` code that isn't already used by another ticket. */
+function generateUniqueCode(prefix: string): string {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const codeExists = db.prepare(`SELECT 1 FROM tickets WHERE code = ?`);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const letters = Array.from({ length: 5 }, () =>
+      String.fromCharCode(97 + Math.floor(Math.random() * 26))
+    ).join("");
+    const code = `${prefix}-${date}-${letters}`;
+    if (!codeExists.get(code)) return code;
+  }
+  // Fall back to a timestamp suffix in the astronomically unlikely event of repeated collisions.
+  return `${prefix}-${date}-${Date.now().toString(36)}`;
+}
+
 export function createTicket(
   guildId: string,
   typeKey: string,
   creatorId: string,
-  channelId: string
+  codePrefix: string
 ): Ticket {
+  const code = generateUniqueCode(codePrefix);
   const info = db
     .prepare(
-      `INSERT INTO tickets (guild_id, type_key, creator_id, channel_id, status, created_at)
-       VALUES (?, ?, ?, ?, 'open', ?)`
+      `INSERT INTO tickets (guild_id, type_key, creator_id, channel_id, code, status, created_at)
+       VALUES (?, ?, ?, '', ?, 'open', ?)`
     )
-    .run(guildId, typeKey, creatorId, channelId, Date.now());
+    .run(guildId, typeKey, creatorId, code, Date.now());
   return getTicketById(info.lastInsertRowid as number)!;
 }
 

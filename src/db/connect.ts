@@ -19,7 +19,8 @@ db.exec(`
     panel_channel_id TEXT,
     panel_message_id TEXT,
     panel_title TEXT,
-    panel_description TEXT
+    panel_description TEXT,
+    ticket_category_id TEXT
   );
 
   CREATE TABLE IF NOT EXISTS ticket_configs (
@@ -48,6 +49,7 @@ db.exec(`
     type_key TEXT NOT NULL,
     creator_id TEXT NOT NULL,
     channel_id TEXT NOT NULL,
+    code TEXT,
     message_id TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     claimed_by TEXT,
@@ -86,3 +88,5 @@ ensureColumn("guild_settings", "panel_message_id", "TEXT");
 ensureColumn("guild_settings", "panel_title", "TEXT");
 ensureColumn("guild_settings", "panel_description", "TEXT");
 ensureColumn("ticket_configs", "option_description", "TEXT");
+ensureColumn("tickets", "code", "TEXT");
+ensureColumn("guild_settings", "ticket_category_id", "TEXT");

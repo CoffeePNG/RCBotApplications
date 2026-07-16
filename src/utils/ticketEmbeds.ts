@@ -49,7 +49,7 @@ export function buildTicketEmbed(
     .setDescription(openMessage.slice(0, 2000))
     .addFields({ name: "Response", value: details.trim().slice(0, 1024) || "*(no response provided)*" })
     .setFooter({
-      text: `${creator.username} (${creator.id}) • Ticket #${ticket.id}`,
+      text: `${creator.username} (${creator.id}) • ${ticket.code ?? `#${ticket.id}`}`,
       iconURL: creator.displayAvatarURL(),
     })
     .setTimestamp(ticket.createdAt);
@@ -111,8 +111,9 @@ export function buildTranscriptLogEmbed(
       ? participants.map((p) => `${p.tag} — ${p.count} message${p.count === 1 ? "" : "s"}`).join("\n")
       : "*no messages*";
 
+  const reference = ticket.code ?? `Ticket #${ticket.id}`;
   return new EmbedBuilder()
-    .setTitle(`${ticketType.displayName} — Ticket #${ticket.id}`)
+    .setTitle(`${ticketType.displayName} — ${reference}`)
     .setColor(0x99aab5)
     .addFields(
       { name: "Opened by", value: `<@${ticket.creatorId}>`, inline: true },
@@ -132,6 +133,6 @@ export function buildTranscriptLogEmbed(
       },
       { name: "Messages", value: participantSummary.slice(0, 1024) }
     )
-    .setFooter({ text: `${ticketType.typeKey} • ticket #${ticket.id}` })
+    .setFooter({ text: `${ticketType.typeKey} • ${reference}` })
     .setTimestamp(ticket.closedAt ?? Date.now());
 }

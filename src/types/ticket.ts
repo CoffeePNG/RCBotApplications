@@ -19,6 +19,7 @@ export interface Ticket {
   typeKey: string;
   creatorId: string;
   channelId: string;
+  code: string | null;
   messageId: string | null;
   status: TicketStatus;
   claimedBy: string | null;
@@ -45,4 +46,5 @@ export interface GuildSettings {
   panelMessageId: string | null;
   panelTitle: string | null;
   panelDescription: string | null;
+  ticketCategoryId: string | null;
 }
