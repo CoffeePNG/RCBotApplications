@@ -13,12 +13,17 @@ function rowToConfig(row: any): TicketTypeConfig {
     openMessage: row.open_message,
     claimMessage: row.claim_message,
     optionDescription: row.option_description,
+    enabled: row.enabled !== 0,
   };
 }
 
-export function getTicketTypes(guildId: string): TicketTypeConfig[] {
+export function getTicketTypes(guildId: string, enabledOnly = false): TicketTypeConfig[] {
   const rows = db
-    .prepare(`SELECT * FROM ticket_configs WHERE guild_id = ? ORDER BY id ASC`)
+    .prepare(
+      enabledOnly
+        ? `SELECT * FROM ticket_configs WHERE guild_id = ? AND enabled = 1 ORDER BY id ASC`
+        : `SELECT * FROM ticket_configs WHERE guild_id = ? ORDER BY id ASC`
+    )
     .all(guildId) as any[];
   return rows.map(rowToConfig);
 }
@@ -36,7 +41,7 @@ export function getTicketTypeById(id: number): TicketTypeConfig | null {
 }
 
 export function ensureTicketType(
-  seed: Omit<TicketTypeConfig, "id" | "reviewChannelId">
+  seed: Omit<TicketTypeConfig, "id" | "reviewChannelId" | "enabled">
 ): TicketTypeConfig {
   const existing = getTicketType(seed.guildId, seed.typeKey);
   if (existing) return existing;
@@ -83,6 +88,14 @@ export function setOptionDescription(guildId: string, typeKey: string, descripti
   const info = db
     .prepare(`UPDATE ticket_configs SET option_description = ? WHERE guild_id = ? AND type_key = ?`)
     .run(description, guildId, typeKey);
+  return info.changes > 0;
+}
+
+/** Enables or disables a ticket type; disabled types can't be opened and are hidden from the panel. */
+export function setEnabled(guildId: string, typeKey: string, enabled: boolean): boolean {
+  const info = db
+    .prepare(`UPDATE ticket_configs SET enabled = ? WHERE guild_id = ? AND type_key = ?`)
+    .run(enabled ? 1 : 0, guildId, typeKey);
   return info.changes > 0;
 }
 

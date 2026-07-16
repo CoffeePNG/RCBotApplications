@@ -40,7 +40,7 @@ export const staffStatusCommand: Command = {
       const leads = getLeads(type.id);
       const counts = getCounts(guildId, type.typeKey);
       embed.addFields({
-        name: `${type.displayName} — ${type.department}`,
+        name: `${type.displayName} — ${type.department} ${type.enabled ? "🟢 open" : "🔴 closed"}`,
         value: [
           `Leads: ${leads.length > 0 ? leads.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
           `Open: **${counts.open}** · Claimed: **${counts.claimed}** · Closed: **${counts.closed}**`,

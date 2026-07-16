@@ -6,7 +6,7 @@ import {
   SlashCommandBuilder,
   MessageFlags,
 } from "discord.js";
-import { getTicketType, setReviewChannel } from "../../db/ticketConfigRepo";
+import { getTicketType, setEnabled, setReviewChannel } from "../../db/ticketConfigRepo";
 import { setTicketCategory } from "../../db/guildSettingsRepo";
 import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
@@ -69,6 +69,17 @@ export const ticketConfigCommand: Command = {
             .addChannelTypes(ChannelType.GuildCategory)
             .setRequired(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("enabled")
+        .setDescription("Open or close a ticket type (closed types can't be opened and hide from the panel).")
+        .addStringOption((opt) =>
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
+        )
+        .addBooleanOption((opt) =>
+          opt.setName("open").setDescription("True to open this type, false to close it").setRequired(true)
+        )
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -109,6 +120,16 @@ export const ticketConfigCommand: Command = {
       setReviewChannel(guildId, typeKey, channel.id);
       await interaction.reply({
         content: `Review/archive channel for **${ticketType.displayName}** set to <#${channel.id}>.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    if (sub === "enabled") {
+      const open = interaction.options.getBoolean("open", true);
+      setEnabled(guildId, typeKey, open);
+      await interaction.reply({
+        content: `**${ticketType.displayName}** tickets are now ${open ? "open" : "closed"}.`,
         flags: MessageFlags.Ephemeral,
       });
       return;

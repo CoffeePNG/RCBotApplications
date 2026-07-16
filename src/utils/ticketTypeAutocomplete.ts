@@ -1,7 +1,10 @@
 import { AutocompleteInteraction } from "discord.js";
 import { getTicketTypes } from "../db/ticketConfigRepo";
 
-export async function respondTicketTypeAutocomplete(interaction: AutocompleteInteraction) {
+export async function respondTicketTypeAutocomplete(
+  interaction: AutocompleteInteraction,
+  enabledOnly = false
+) {
   const guildId = interaction.guildId;
   if (!guildId) {
     await interaction.respond([]);
@@ -9,7 +12,7 @@ export async function respondTicketTypeAutocomplete(interaction: AutocompleteInt
   }
 
   const focused = interaction.options.getFocused().toLowerCase();
-  const types = getTicketTypes(guildId).filter(
+  const types = getTicketTypes(guildId, enabledOnly).filter(
     (t) =>
       t.displayName.toLowerCase().includes(focused) || t.typeKey.toLowerCase().includes(focused)
   );

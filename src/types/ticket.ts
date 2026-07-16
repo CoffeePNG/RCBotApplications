@@ -9,6 +9,7 @@ export interface TicketTypeConfig {
   openMessage: string;
   claimMessage: string;
   optionDescription: string | null;
+  enabled: boolean;
 }
 
 export type TicketStatus = "open" | "claimed" | "closed";

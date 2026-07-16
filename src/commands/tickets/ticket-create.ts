@@ -45,11 +45,18 @@ export const ticketCreateCommand: Command = {
       });
       return;
     }
+    if (!ticketType.enabled) {
+      await interaction.reply({
+        content: `**${ticketType.displayName}** tickets are currently closed.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
 
     await interaction.showModal(buildTicketDetailsModal(ticketType));
   },
 
   async autocomplete(interaction: AutocompleteInteraction) {
-    await respondTicketTypeAutocomplete(interaction);
+    await respondTicketTypeAutocomplete(interaction, true);
   },
 };

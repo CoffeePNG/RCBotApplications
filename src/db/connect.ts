@@ -34,6 +34,7 @@ db.exec(`
     open_message TEXT NOT NULL,
     claim_message TEXT NOT NULL,
     option_description TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
     UNIQUE (guild_id, type_key)
   );
 
@@ -90,3 +91,4 @@ ensureColumn("guild_settings", "panel_description", "TEXT");
 ensureColumn("ticket_configs", "option_description", "TEXT");
 ensureColumn("tickets", "code", "TEXT");
 ensureColumn("guild_settings", "ticket_category_id", "TEXT");
+ensureColumn("ticket_configs", "enabled", "INTEGER NOT NULL DEFAULT 1");

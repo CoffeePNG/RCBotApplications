@@ -19,7 +19,7 @@ export interface PanelContent {
 
 /** Builds the panel embed + ticket-type select menu; null if the guild has no ticket types yet. */
 export function buildPanelContent(guildId: string): PanelContent | null {
-  const types = getTicketTypes(guildId);
+  const types = getTicketTypes(guildId, true);
   if (types.length === 0) return null;
 
   const settings = getGuildSettings(guildId);

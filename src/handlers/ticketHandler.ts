@@ -76,6 +76,13 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     });
     return;
   }
+  if (!ticketType.enabled) {
+    await interaction.reply({
+      content: `**${ticketType.displayName}** tickets are currently closed.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   const details = interaction.fields.getTextInputValue("details");
   const leads = getLeads(ticketType.id);
@@ -181,6 +188,13 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
   if (!ticketType) {
     await interaction.reply({
       content: "This ticket type is no longer configured.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  if (!ticketType.enabled) {
+    await interaction.reply({
+      content: `**${ticketType.displayName}** tickets are currently closed.`,
       flags: MessageFlags.Ephemeral,
     });
     return;
