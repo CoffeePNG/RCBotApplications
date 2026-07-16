@@ -74,6 +74,72 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings (guild_id, user_id);
+
+  CREATE TABLE IF NOT EXISTS ticket_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    type_key TEXT NOT NULL,
+    internal_key TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    placeholder TEXT,
+    input_style TEXT NOT NULL DEFAULT 'paragraph',
+    required INTEGER NOT NULL DEFAULT 1,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE (guild_id, type_key, internal_key)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_questions_guild_type ON ticket_questions (guild_id, type_key, position);
+
+  CREATE TABLE IF NOT EXISTS ticket_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    question_internal_key TEXT,
+    question_label_snapshot TEXT NOT NULL,
+    question_position_snapshot INTEGER NOT NULL,
+    answer TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_answers_ticket ON ticket_answers (ticket_id, question_position_snapshot);
+
+  CREATE TABLE IF NOT EXISTS claim_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    previous_claimant TEXT,
+    new_claimant TEXT,
+    actor_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_claim_history_ticket ON claim_history (ticket_id);
+
+  CREATE TABLE IF NOT EXISTS ticket_participants (
+    ticket_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (ticket_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    ticket_id INTEGER,
+    ticket_code TEXT,
+    actor_id TEXT,
+    target_id TEXT,
+    event_type TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_guild ON audit_log (guild_id, created_at);
 `);
 
 function ensureColumn(table: string, column: string, definition: string): void {
@@ -92,3 +158,11 @@ ensureColumn("ticket_configs", "option_description", "TEXT");
 ensureColumn("tickets", "code", "TEXT");
 ensureColumn("guild_settings", "ticket_category_id", "TEXT");
 ensureColumn("ticket_configs", "enabled", "INTEGER NOT NULL DEFAULT 1");
+// Feature batch: structured close + shared archive channel.
+ensureColumn("guild_settings", "archive_channel_id", "TEXT");
+ensureColumn("tickets", "close_reason", "TEXT");
+ensureColumn("tickets", "outcome", "TEXT");
+ensureColumn("tickets", "archive_channel_id", "TEXT");
+ensureColumn("tickets", "archive_message_id", "TEXT");
+ensureColumn("tickets", "archived_at", "INTEGER");
+ensureColumn("tickets", "archive_error", "TEXT");

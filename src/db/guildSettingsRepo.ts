@@ -13,6 +13,7 @@ export function getGuildSettings(guildId: string): GuildSettings {
     panelTitle: row ? row.panel_title : null,
     panelDescription: row ? row.panel_description : null,
     ticketCategoryId: row ? row.ticket_category_id : null,
+    archiveChannelId: row ? row.archive_channel_id : null,
   };
 }
 
@@ -22,6 +23,14 @@ export function setTicketCategory(guildId: string, categoryId: string): void {
      VALUES (?, ?)
      ON CONFLICT(guild_id) DO UPDATE SET ticket_category_id = excluded.ticket_category_id`
   ).run(guildId, categoryId);
+}
+
+export function setArchiveChannel(guildId: string, channelId: string): void {
+  db.prepare(
+    `INSERT INTO guild_settings (guild_id, archive_channel_id)
+     VALUES (?, ?)
+     ON CONFLICT(guild_id) DO UPDATE SET archive_channel_id = excluded.archive_channel_id`
+  ).run(guildId, channelId);
 }
 
 export function setModLogChannel(guildId: string, channelId: string): void {

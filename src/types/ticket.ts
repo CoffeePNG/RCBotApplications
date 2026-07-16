@@ -12,7 +12,7 @@ export interface TicketTypeConfig {
   enabled: boolean;
 }
 
-export type TicketStatus = "open" | "claimed" | "closed";
+export type TicketStatus = "open" | "claimed" | "closing" | "closing_failed" | "closed";
 
 export interface Ticket {
   id: number;
@@ -28,6 +28,46 @@ export interface Ticket {
   claimedAt: number | null;
   closedAt: number | null;
   closedBy: string | null;
+  closeReason: string | null;
+  outcome: string | null;
+  archiveChannelId: string | null;
+  archiveMessageId: string | null;
+  archivedAt: number | null;
+  archiveError: string | null;
+}
+
+export type QuestionStyle = "short" | "paragraph";
+
+export interface TicketQuestion {
+  id: number;
+  guildId: string;
+  typeKey: string;
+  internalKey: string;
+  position: number;
+  label: string;
+  placeholder: string | null;
+  inputStyle: QuestionStyle;
+  required: boolean;
+  enabled: boolean;
+}
+
+export interface TicketAnswer {
+  id: number;
+  ticketId: number;
+  questionInternalKey: string | null;
+  questionLabel: string;
+  questionPosition: number;
+  answer: string | null;
+}
+
+export type ClaimAction = "claim" | "unclaim" | "takeover" | "assign";
+
+export interface Participant {
+  ticketId: number;
+  userId: string;
+  addedBy: string;
+  addedAt: number;
+  active: boolean;
 }
 
 export interface Warning {
@@ -48,4 +88,5 @@ export interface GuildSettings {
   panelTitle: string | null;
   panelDescription: string | null;
   ticketCategoryId: string | null;
+  archiveChannelId: string | null;
 }
