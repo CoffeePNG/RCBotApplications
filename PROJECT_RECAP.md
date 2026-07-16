@@ -13,31 +13,40 @@ storing everything in a local SQLite file.
   create → claim → close pipeline. What differs between types is data in the
   database, not separate code paths — adding a new type later is a config
   entry, not new code.
-- **No Discord roles for ticket visibility.** Who can see/claim/manage a
-  ticket type ("leads") is resolved by Discord **user ID** against a database
-  table, not by role membership. Keeps the public server free of staff-only
-  roles. Ticket channels use per-user permission overwrites (creator + that
-  type's leads + the bot); `@everyone` is denied View Channel.
+- **No Discord roles for ticket visibility.** Access is resolved by Discord
+  **user ID** against database tables, not role membership. Two tiers: *type
+  staff* (`ticket_leads`, per type) and global *Ticket Managers*
+  (`ticket_managers`, all types), with `Manage Server`/`Administrator` a live
+  override on top. All checks funnel through one helper (`utils/ticketAuth.ts`).
+  Ticket channels use per-user overwrites (creator + staff + managers + added
+  participants + the bot); `@everyone` is denied View Channel, and overwrites
+  are kept in sync live as people are added/removed.
 - **Scoped bot permissions.** Needs Manage Channels, Kick/Ban Members,
   Moderate Members — **not** Administrator, and not Manage Roles.
-- **Built for handoff.** Day-to-day management (leads, channels, messages,
-  panel, open/closed state) is all done through Discord slash commands and
-  modals — no terminal access or file editing needed.
+- **Built for handoff.** Day-to-day management (staff, managers, questions,
+  channels, messages, panel, open/closed state) is all done through Discord
+  slash commands and modals — no terminal access or file editing needed.
 
 ---
 
 ## Ticket lifecycle
 
 1. **Create** — a member runs `/ticket create` (or clicks the panel dropdown),
-   fills out a modal, and the bot creates a private channel with the right
-   permission overwrites, posts a summary embed with Claim/Close buttons, and
-   pings the type's leads.
-2. **Claim** — a lead clicks **Claim** (single-claim: locks to one person).
-   The button disables, and the ticket creator gets pinged.
-3. **Close** — a lead or the creator clicks **Close** → an ephemeral
-   **Confirm/Cancel** prompt appears (so a misclick can't nuke a ticket) →
-   on confirm, a public "closed by X, deleting in 5s" notice is posted, the
-   transcript is archived, and the channel is deleted.
+   fills out a modal built from that type's configured questions, and the bot
+   creates a private channel with the right permission overwrites, posts a
+   summary embed with Claim/Close buttons, and pings the type's staff.
+2. **Claim** — staff or a manager clicks **Claim** (single-claim: locks to one
+   person). The button set becomes **Unclaim** / **Take Over**, and the creator
+   gets pinged. The claimant/manager can also `/ticket unclaim` or
+   `/ticket assign @user`; every ownership change is logged in `claim_history`.
+   Extra people can be pulled in with `/ticket add @user`.
+3. **Close** — staff, the claimant, a manager, or the creator clicks **Close**
+   → a **modal** collects a structured outcome (Resolved / Approved / Denied /
+   Duplicate / Invalid / Withdrawn / No Response / Other) + optional reason. On
+   submit the channel is locked, a "closed by X" notice is posted, the
+   transcript is archived **and verified**, and only then is the channel
+   deleted. If archiving fails the channel is kept and the ticket sits in
+   `closing_failed` for `/ticket archive-retry` — a transcript is never lost.
 
 ### Ticket codes
 
@@ -49,10 +58,15 @@ filename. Numeric IDs still run the internals (buttons/lookups).
 
 ### Ticket archive (on close)
 
-Posted to the type's review/archive channel:
-1. A **summary embed** — ticket code, opened/claimed/closed by, duration, and a
-   **per-person message count** (not the transcript text).
-2. Below it, the **transcript** as a code block plus a full `.txt` attachment.
+Posted to the resolved archive channel — one shared channel
+(`/ticket-config archive-channel`) if set, else the type's per-type review
+channel:
+1. A **summary embed** — ticket code, opened/claimed/closed by, **outcome**,
+   optional **reason**, duration, and a **per-person message count**.
+2. The full **transcript** as a `.txt` attachment (split across files if it
+   exceeds Discord's upload limit), never a code block. Each line carries author
+   tag+id, message id, reply refs, edit timestamps, pins, attachments, embed
+   counts, and system events.
 
 Transcripts capture what users actually typed (requires the **Message Content**
 privileged intent, enabled in code and in the Developer Portal).
@@ -71,25 +85,38 @@ Four seeded by default, all **enabled** on first run:
 | Help Request | `help_request` | support | `help` |
 
 Each type has: display name, department, channel prefix, review channel,
-leads, open/claim message templates, dropdown blurb, and an open/closed flag.
+staff, open/claim message templates, dropdown blurb, an open/closed flag, and
+its own set of **1–5 configurable questions** (label, placeholder, short/
+paragraph, required, order) asked in the create modal. Answers are **snapshotted**
+onto each ticket, so editing a type's questions never rewrites old tickets.
 
 ---
 
 ## Commands
 
 ### Tickets
-- `/ticket create type:<autocomplete>` — anyone; opens the details modal.
+- `/ticket create type:<autocomplete>` — anyone; opens the questions modal.
 - **Ticket panel** — a persistent embed + dropdown (Ticket Tool style) that
   members click instead of typing the command. Only shows **open** types.
-- **Claim / Close buttons** on the ticket message (with the confirm-close step).
+- **Claim / Unclaim / Take Over / Close buttons** on the ticket message (Close
+  opens the structured outcome+reason modal).
+- `/ticket unclaim` · `/ticket assign user:<>` — release/reassign the claim.
+- `/ticket add user:<>` · `/ticket remove user:<>` — manage extra participants.
+- `/ticket archive-retry` — retry a close whose transcript failed to archive.
 
 ### Admin (require Manage Server)
-- `/staff-assign type:<> action:<add|remove> user:<>` — manage a type's leads
-  live, no restart.
-- `/staff-status` — embed of every type: leads, live open/claimed/closed
-  counts, review channel, and 🟢 open / 🔴 closed state.
-- `/ticket-config review-channel type:<> channel:<>` — set a type's
+- `/staff add|remove type:<> user:<>` — manage a type's staff live (syncs
+  channel access on open tickets), `/staff list [type]` to view.
+- `/staff manager-add|manager-remove|manager-list user:<>` — global Ticket
+  Managers (can manage every type).
+- `/staff-status` — embed of Ticket Managers, the shared archive channel, and
+  every type: staff, live counts, review channel, and 🟢/🔴 state.
+- `/ticket-config review-channel type:<> channel:<>` — set a type's per-type
   review/archive channel.
+- `/ticket-config archive-channel channel:<>` — one shared archive channel for
+  all types (falls back to per-type review channel when unset).
+- `/ticket-config questions type:<>` — add/edit/remove/reorder/reset a type's
+  1–5 create questions (panel of buttons + modals).
 - `/ticket-config open-message | claim-message | option-description type:<>` —
   each opens a **modal** pre-filled with the current text to edit (multi-line
   friendly). Dropdown blurb = the sub-text shown under a type in the panel.
@@ -120,11 +147,11 @@ Successful mod actions are logged as an embed to the mod-log channel if set.
 
 | Question | Decision |
 |---|---|
-| Single- or multi-claim? | Single-claim. |
-| Transcript delivery | Archive channel only (embed + code block + `.txt`). |
-| Application approval automation | Status update only — no auto role assignment. |
-| Auto-close inactive tickets | Not implemented — manual close only. |
-| Lead notification on new ticket | Leads pinged in the channel + notice in review channel. |
+| Single- or multi-claim? | Single-claim, with unclaim / take over / assign. |
+| Transcript delivery | Archive channel only (summary embed + `.txt` file(s), no code block). |
+| Application approval automation | Status update only — no auto role assignment; close records a structured outcome. |
+| Auto-close inactive tickets | Not implemented — manual close only. Claims auto-release only when the holder leaves the server. |
+| Staff notification on new ticket | Staff pinged in the channel + notice in review channel. |
 | Text-heavy config editing | Via modals, not cramped slash-command options. |
 | No web dashboard | Everything is Discord-native per the spec. |
 
@@ -143,20 +170,24 @@ Successful mod actions are logged as an embed to the mod-log channel if set.
 - **After adding/changing slash commands:** run the one-time `deploy-commands`
   step to register them with Discord (temporarily point the start command at
   `dist/deploy-commands.js`, restart, then switch back).
-- **Required privileged intent:** Message Content (Developer Portal → Bot →
-  Privileged Gateway Intents) — needed for transcript capture; the bot won't
-  start without it since it requests the intent.
+- **Required privileged intents:** Message Content (transcript capture) and
+  Server Members / GuildMembers (release a staff member's claims when they leave)
+  — both must be enabled in the Developer Portal → Bot → Privileged Gateway
+  Intents; the bot won't start without them since it requests both.
 
 ---
 
 ## First-time setup checklist (in Discord)
 
-1. `/ticket-config review-channel type:<each> channel:<#...>`
-2. `/staff-assign type:<each> action:add user:<@lead>` (per lead)
-3. `/ticket-config category category:<pick a category>`
-4. `/mod-config log-channel channel:<#mod-log>`
-5. `/ticket-config enabled type:<> open:false` for any types not ready yet
-6. `/ticket-panel post channel:<#create-a-ticket>`
+1. `/ticket-config archive-channel channel:<#ticket-archive>` (or per-type
+   `/ticket-config review-channel type:<each> channel:<#...>`)
+2. `/staff add type:<each> user:<@staff>` (per staff); optionally
+   `/staff manager-add user:<@manager>` for a global manager
+3. `/ticket-config questions type:<each>` — review/adjust the seeded questions
+4. `/ticket-config category category:<pick a category>`
+5. `/mod-config log-channel channel:<#mod-log>`
+6. `/ticket-config enabled type:<> open:false` for any types not ready yet
+7. `/ticket-panel post channel:<#create-a-ticket>`
 
 Members can then use `/ticket create` or the panel.
 

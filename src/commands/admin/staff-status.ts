@@ -7,6 +7,8 @@ import {
 } from "discord.js";
 import { getLeads, getTicketTypes } from "../../db/ticketConfigRepo";
 import { getCounts } from "../../db/ticketRepo";
+import { getManagers } from "../../db/managerRepo";
+import { getGuildSettings } from "../../db/guildSettingsRepo";
 import { Command } from "../types";
 
 export const staffStatusCommand: Command = {
@@ -34,16 +36,28 @@ export const staffStatusCommand: Command = {
       return;
     }
 
+    const settings = getGuildSettings(guildId);
+    const managers = getManagers(guildId);
+
     const embed = new EmbedBuilder().setTitle("Ticket System Status").setColor(0x5865f2);
+    embed.addFields({
+      name: "Global",
+      value: [
+        `Ticket Managers: ${managers.length > 0 ? managers.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
+        `Shared archive channel: ${settings.archiveChannelId ? `<#${settings.archiveChannelId}>` : "*not set (per-type review channels used)*"}`,
+      ].join("\n"),
+    });
 
     for (const type of types) {
       const leads = getLeads(type.id);
       const counts = getCounts(guildId, type.typeKey);
+      const stuck = counts.closing + counts.closing_failed;
       embed.addFields({
         name: `${type.displayName} — ${type.department} ${type.enabled ? "🟢 open" : "🔴 closed"}`,
         value: [
-          `Leads: ${leads.length > 0 ? leads.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
-          `Open: **${counts.open}** · Claimed: **${counts.claimed}** · Closed: **${counts.closed}**`,
+          `Staff: ${leads.length > 0 ? leads.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
+          `Open: **${counts.open}** · Claimed: **${counts.claimed}** · Closed: **${counts.closed}**` +
+            (stuck > 0 ? ` · ⚠️ Awaiting archive: **${stuck}**` : ""),
           `Review channel: ${type.reviewChannelId ? `<#${type.reviewChannelId}>` : "*not set*"}`,
         ].join("\n"),
       });

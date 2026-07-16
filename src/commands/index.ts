@@ -1,6 +1,5 @@
 import { Command } from "./types";
 import { ticketCreateCommand } from "./tickets/ticket-create";
-import { staffAssignCommand } from "./admin/staff-assign";
 import { staffStatusCommand } from "./admin/staff-status";
 import { staffCommand } from "./admin/staff";
 import { ticketConfigCommand } from "./admin/ticket-config";
@@ -15,7 +14,6 @@ import { warningsCommand } from "./moderation/warnings";
 
 export const commands: Command[] = [
   ticketCreateCommand,
-  staffAssignCommand,
   staffStatusCommand,
   staffCommand,
   ticketConfigCommand,
