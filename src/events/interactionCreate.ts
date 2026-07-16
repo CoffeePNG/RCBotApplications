@@ -27,11 +27,19 @@ export async function handleInteraction(
   interaction: Interaction,
   commandsByName: Map<string, Command>
 ) {
+  const startedAt = Date.now();
   try {
     if (interaction.isChatInputCommand()) {
+      console.log(
+        `[interaction] /${interaction.commandName} from ${interaction.user.tag} in guild ${interaction.guildId ?? "DM"}`
+      );
       const command = commandsByName.get(interaction.commandName);
-      if (!command) return;
+      if (!command) {
+        console.warn(`[interaction] no handler registered for command "${interaction.commandName}"`);
+        return;
+      }
       await command.execute(interaction);
+      console.log(`[interaction] /${interaction.commandName} handled in ${Date.now() - startedAt}ms`);
       return;
     }
 
@@ -73,11 +81,22 @@ export async function handleInteraction(
       return;
     }
   } catch (error) {
-    console.error("Error handling interaction:", error);
-    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction
-        .reply({ content: "Something went wrong handling that action.", flags: MessageFlags.Ephemeral })
-        .catch(() => null);
+    const label = interaction.isChatInputCommand()
+      ? `/${interaction.commandName}`
+      : interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()
+        ? interaction.customId
+        : interaction.type;
+    console.error(`[interaction] error handling ${label} after ${Date.now() - startedAt}ms:`, error);
+
+    if (interaction.isRepliable()) {
+      const content = "Something went wrong handling that action.";
+      const respond =
+        interaction.replied || interaction.deferred
+          ? interaction.followUp({ content, flags: MessageFlags.Ephemeral })
+          : interaction.reply({ content, flags: MessageFlags.Ephemeral });
+      await respond.catch((replyError) =>
+        console.error("[interaction] failed to send error notice:", replyError)
+      );
     }
   }
 }
