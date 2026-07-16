@@ -1,17 +1,26 @@
 import { PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import { isLead } from "../db/ticketConfigRepo";
 import { isActiveParticipant } from "../db/participantRepo";
+import { isManagerAssigned } from "../db/managerRepo";
 import { Ticket, TicketTypeConfig } from "../types/ticket";
 
 type Perms = PermissionsBitField | Readonly<PermissionsBitField> | null | undefined;
 
+/** Discord admin override — Manage Server or Administrator, checked live from current perms. */
+export function hasAdminOverride(permissions: Perms): boolean {
+  return (
+    !!permissions?.has(PermissionFlagsBits.ManageGuild) ||
+    !!permissions?.has(PermissionFlagsBits.Administrator)
+  );
+}
+
 /**
- * Centralized ticket authorization. "Global ticket manager" is currently mapped
- * to the Manage Server permission (the existing admin override). If a separate
- * configurable manager list is ever wanted, this is the single place to change.
+ * Full management access: an explicitly assigned Ticket Manager, or a Discord
+ * admin override (Manage Server / Administrator). Ticket Managers are stored by
+ * user ID in the ticket_managers table.
  */
-export function isManager(permissions: Perms): boolean {
-  return !!permissions?.has(PermissionFlagsBits.ManageGuild);
+export function isManager(guildId: string, userId: string, permissions: Perms): boolean {
+  return hasAdminOverride(permissions) || isManagerAssigned(guildId, userId);
 }
 
 export function isTypeStaff(ticketConfigId: number, userId: string): boolean {
@@ -37,25 +46,29 @@ interface Ctx {
   ticketType: TicketTypeConfig;
 }
 
+function manages(ctx: Ctx): boolean {
+  return isManager(ctx.ticket.guildId, ctx.userId, ctx.permissions);
+}
+
 /** Claim / take over: assigned staff for the type, or a manager. */
 export function canClaim(ctx: Ctx): boolean {
-  return isManager(ctx.permissions) || isTypeStaff(ctx.ticketType.id, ctx.userId);
+  return manages(ctx) || isTypeStaff(ctx.ticketType.id, ctx.userId);
 }
 
 /** Unclaim: the current claimant or a manager. */
 export function canUnclaim(ctx: Ctx): boolean {
-  return isManager(ctx.permissions) || isClaimant(ctx.ticket, ctx.userId);
+  return manages(ctx) || isClaimant(ctx.ticket, ctx.userId);
 }
 
 /** Assign to a specific staff member: managers, or the claimant (target still validated separately). */
 export function canAssign(ctx: Ctx): boolean {
-  return isManager(ctx.permissions) || isClaimant(ctx.ticket, ctx.userId);
+  return manages(ctx) || isClaimant(ctx.ticket, ctx.userId);
 }
 
 /** Close: creator, current claimant, assigned staff, or a manager. */
 export function canClose(ctx: Ctx): boolean {
   return (
-    isManager(ctx.permissions) ||
+    manages(ctx) ||
     isTypeStaff(ctx.ticketType.id, ctx.userId) ||
     isClaimant(ctx.ticket, ctx.userId) ||
     isCreator(ctx.ticket, ctx.userId)
@@ -64,9 +77,24 @@ export function canClose(ctx: Ctx): boolean {
 
 /** Add/remove participants: claimant, assigned staff, or a manager. */
 export function canManageParticipants(ctx: Ctx): boolean {
+  return manages(ctx) || isTypeStaff(ctx.ticketType.id, ctx.userId) || isClaimant(ctx.ticket, ctx.userId);
+}
+
+/**
+ * Does the user still have a bot-managed reason to keep a permission overwrite on
+ * a ticket channel (used when removing staff/manager access)? Deliberately excludes
+ * Discord admin override, which grants access independently of overwrites.
+ */
+export function hasResidualTicketAccess(
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  userId: string
+): boolean {
   return (
-    isManager(ctx.permissions) ||
-    isTypeStaff(ctx.ticketType.id, ctx.userId) ||
-    isClaimant(ctx.ticket, ctx.userId)
+    isCreator(ticket, userId) ||
+    isClaimant(ticket, userId) ||
+    isTypeStaff(ticketType.id, userId) ||
+    isManagerAssigned(ticket.guildId, userId) ||
+    isActiveParticipant(ticket.id, userId)
   );
 }

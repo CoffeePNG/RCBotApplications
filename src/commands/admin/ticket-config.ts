@@ -7,7 +7,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { getTicketType, setEnabled, setReviewChannel } from "../../db/ticketConfigRepo";
-import { setTicketCategory } from "../../db/guildSettingsRepo";
+import { setArchiveChannel, setTicketCategory } from "../../db/guildSettingsRepo";
 import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
 import { buildQuestionsPanel } from "../../handlers/questionAdminHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
@@ -73,6 +73,18 @@ export const ticketConfigCommand: Command = {
     )
     .addSubcommand((sub) =>
       sub
+        .setName("archive-channel")
+        .setDescription("Set one shared channel that closed-ticket transcripts are archived to (all types).")
+        .addChannelOption((opt) =>
+          opt
+            .setName("channel")
+            .setDescription("The shared archive channel")
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName("enabled")
         .setDescription("Open or close a ticket type (closed types can't be opened and hide from the panel).")
         .addStringOption((opt) =>
@@ -109,6 +121,17 @@ export const ticketConfigCommand: Command = {
       setTicketCategory(guildId, category.id);
       await interaction.reply({
         content: `New tickets will now open under the **${category.name}** category.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // `archive-channel` is also a guild-wide setting (shared across all types).
+    if (sub === "archive-channel") {
+      const channel = interaction.options.getChannel("channel", true);
+      setArchiveChannel(guildId, channel.id);
+      await interaction.reply({
+        content: `Closed-ticket transcripts will now be archived to <#${channel.id}> for all ticket types.`,
         flags: MessageFlags.Ephemeral,
       });
       return;

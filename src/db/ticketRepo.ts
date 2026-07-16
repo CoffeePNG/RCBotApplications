@@ -161,6 +161,13 @@ export function getOpenTicketsByType(guildId: string, typeKey: string): Ticket[]
   return rows.map(rowToTicket);
 }
 
+export function getOpenTickets(guildId: string): Ticket[] {
+  const rows = db
+    .prepare(`SELECT * FROM tickets WHERE guild_id = ? AND status IN ('open','claimed')`)
+    .all(guildId) as any[];
+  return rows.map(rowToTicket);
+}
+
 export function getActiveTicketsClaimedBy(guildId: string, userId: string): Ticket[] {
   const rows = db
     .prepare(

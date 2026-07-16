@@ -140,6 +140,14 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_audit_guild ON audit_log (guild_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS ticket_managers (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
 `);
 
 function ensureColumn(table: string, column: string, definition: string): void {

@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import { getLeads, getTicketType } from "../db/ticketConfigRepo";
 import { getGuildSettings } from "../db/guildSettingsRepo";
+import { getManagers } from "../db/managerRepo";
 import {
   claimTicket,
   closeTicket,
@@ -131,12 +132,14 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
         PermissionFlagsBits.ManageChannels,
       ],
     },
-    ...leads.map((leadId) => ({
-      id: leadId,
+    ...[...new Set([...leads, ...getManagers(guildId)])].map((viewerId) => ({
+      id: viewerId,
       allow: [
         PermissionFlagsBits.ViewChannel,
         PermissionFlagsBits.SendMessages,
         PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AttachFiles,
+        PermissionFlagsBits.EmbedLinks,
       ],
     })),
   ];

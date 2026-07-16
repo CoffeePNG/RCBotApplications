@@ -3,6 +3,7 @@ import { config } from "./config";
 import { commands } from "./commands";
 import { handleInteraction } from "./events/interactionCreate";
 import { seedDefaultTicketTypes } from "./seed/defaultTicketTypes";
+import { releaseClaimsForDepartedMember } from "./utils/staffLifecycle";
 import "./db/connect";
 
 process.on("unhandledRejection", (reason) => {
@@ -14,12 +15,15 @@ process.on("uncaughtException", (error) => {
 
 const client = new Client({
   // GuildMessages + MessageContent are required to read what users typed for the
-  // ticket transcript. MessageContent is a privileged intent — it must also be
-  // enabled in the Discord Developer Portal (Bot → Privileged Gateway Intents).
+  // ticket transcript. GuildMembers lets us free a staff member's claimed tickets
+  // when they leave the server. MessageContent and GuildMembers are privileged
+  // intents — they must ALSO be enabled in the Discord Developer Portal
+  // (Bot → Privileged Gateway Intents) or login will fail.
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
   ],
 });
 
@@ -34,6 +38,12 @@ client.once(Events.ClientReady, (readyClient) => {
 
 client.on(Events.InteractionCreate, (interaction) => {
   void handleInteraction(interaction, commandsByName);
+});
+
+client.on(Events.GuildMemberRemove, (member) => {
+  void releaseClaimsForDepartedMember(client, member.guild.id, member.id).catch((error) =>
+    console.error("[guildMemberRemove] failed to release claims:", error)
+  );
 });
 
 client.on(Events.Error, (error) => console.error("[client] websocket error:", error));
