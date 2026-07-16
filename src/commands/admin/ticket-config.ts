@@ -9,6 +9,7 @@ import {
 import { getTicketType, setEnabled, setReviewChannel } from "../../db/ticketConfigRepo";
 import { setTicketCategory } from "../../db/guildSettingsRepo";
 import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
+import { buildQuestionsPanel } from "../../handlers/questionAdminHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
 import { Command } from "../types";
 
@@ -80,6 +81,14 @@ export const ticketConfigCommand: Command = {
         .addBooleanOption((opt) =>
           opt.setName("open").setDescription("True to open this type, false to close it").setRequired(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("questions")
+        .setDescription("Manage the questions asked when a ticket of this type is opened.")
+        .addStringOption((opt) =>
+          opt.setName("type").setDescription(TYPE_OPTION_DESCRIPTION).setRequired(true).setAutocomplete(true)
+        )
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -130,6 +139,14 @@ export const ticketConfigCommand: Command = {
       setEnabled(guildId, typeKey, open);
       await interaction.reply({
         content: `**${ticketType.displayName}** tickets are now ${open ? "open" : "closed"}.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    if (sub === "questions") {
+      await interaction.reply({
+        ...buildQuestionsPanel(guildId, typeKey),
         flags: MessageFlags.Ephemeral,
       });
       return;

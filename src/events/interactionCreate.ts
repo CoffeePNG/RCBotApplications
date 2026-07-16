@@ -22,6 +22,22 @@ import {
   handleTicketCreateModal,
   handleTicketPanelSelect,
 } from "../handlers/ticketHandler";
+import {
+  Q_ADD,
+  Q_ADD_MODAL,
+  Q_DOWN,
+  Q_EDIT,
+  Q_EDIT_MODAL,
+  Q_REMOVE,
+  Q_RESET,
+  Q_SELECT,
+  Q_UP,
+  handleQuestionButton,
+  handleQuestionModalSubmit,
+  handleQuestionSelect,
+} from "../handlers/questionAdminHandler";
+
+const QUESTION_BUTTON_PREFIXES = [Q_ADD, Q_RESET, Q_EDIT, Q_REMOVE, Q_UP, Q_DOWN];
 
 export async function handleInteraction(
   interaction: Interaction,
@@ -57,6 +73,11 @@ export async function handleInteraction(
         await handleConfigEditModalSubmit(interaction);
       } else if (interaction.customId === PANEL_EDIT_MODAL_ID) {
         await handlePanelEditModalSubmit(interaction);
+      } else if (
+        interaction.customId.startsWith(Q_ADD_MODAL) ||
+        interaction.customId.startsWith(Q_EDIT_MODAL)
+      ) {
+        await handleQuestionModalSubmit(interaction);
       }
       return;
     }
@@ -64,6 +85,8 @@ export async function handleInteraction(
     if (interaction.isStringSelectMenu()) {
       if (interaction.customId === TICKET_PANEL_SELECT_ID) {
         await handleTicketPanelSelect(interaction);
+      } else if (interaction.customId.startsWith(Q_SELECT)) {
+        await handleQuestionSelect(interaction);
       }
       return;
     }
@@ -77,6 +100,8 @@ export async function handleInteraction(
         await handleTicketCloseRequest(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaim(interaction);
+      } else if (QUESTION_BUTTON_PREFIXES.some((p) => interaction.customId.startsWith(p))) {
+        await handleQuestionButton(interaction);
       }
       return;
     }

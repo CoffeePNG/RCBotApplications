@@ -20,6 +20,8 @@ import {
   setChannelId,
   setMessageId,
 } from "../db/ticketRepo";
+import { getQuestions } from "../db/questionRepo";
+import { saveAnswers } from "../db/answerRepo";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
@@ -28,7 +30,7 @@ import {
   buildTicketEmbed,
   buildTranscriptLogEmbed,
 } from "../utils/ticketEmbeds";
-import { buildTicketDetailsModal } from "../utils/ticketModal";
+import { buildTicketDetailsModal, questionFieldId } from "../utils/ticketModal";
 import { canManageTicket } from "../utils/permissions";
 import { generateTranscript } from "../utils/transcript";
 import {
@@ -84,7 +86,18 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     return;
   }
 
-  const details = interaction.fields.getTextInputValue("details");
+  // Read each configured question's answer from the modal (safe if a question
+  // was removed between the modal opening and submission).
+  const questions = getQuestions(guildId, typeKey);
+  const answerEntries = questions.map((question) => {
+    let answer = "";
+    try {
+      answer = interaction.fields.getTextInputValue(questionFieldId(question)).trim();
+    } catch {
+      answer = "";
+    }
+    return { question, answer };
+  });
   const leads = getLeads(ticketType.id);
 
   // Create the ticket row first so its unique code (used as the channel name) exists.
@@ -95,6 +108,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     ticketType.channelPrefix,
     interaction.user.username
   );
+  saveAnswers(ticket.id, answerEntries);
   const channelName = ticket.code ?? `ticket-${ticket.id}`;
 
   const overwrites: OverwriteResolvable[] = [
@@ -157,7 +171,15 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
 
   const message = await channel.send({
     content: pingLine,
-    embeds: [buildTicketEmbed(ticket, ticketType, details, interaction.user, openMessage)],
+    embeds: [
+      buildTicketEmbed(
+        ticket,
+        ticketType,
+        answerEntries.map((e) => ({ label: e.question.label, answer: e.answer })),
+        interaction.user,
+        openMessage
+      ),
+    ],
     components: [buildTicketButtons(ticket.id, false, false)],
   });
   setMessageId(ticket.id, message.id);
@@ -200,7 +222,15 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
     return;
   }
 
-  await interaction.showModal(buildTicketDetailsModal(ticketType));
+  const modal = buildTicketDetailsModal(ticketType);
+  if (!modal) {
+    await interaction.reply({
+      content: `**${ticketType.displayName}** isn't ready yet — no questions are configured. Please contact an admin.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await interaction.showModal(modal);
 }
 
 /** Claim button: locks the ticket to one lead (or Manage Server holder) and pings the creator. */

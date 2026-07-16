@@ -53,7 +53,15 @@ export const ticketCreateCommand: Command = {
       return;
     }
 
-    await interaction.showModal(buildTicketDetailsModal(ticketType));
+    const modal = buildTicketDetailsModal(ticketType);
+    if (!modal) {
+      await interaction.reply({
+        content: `**${ticketType.displayName}** isn't ready yet — no questions are configured. Please contact an admin.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await interaction.showModal(modal);
   },
 
   async autocomplete(interaction: AutocompleteInteraction) {

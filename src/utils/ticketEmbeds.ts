@@ -36,23 +36,30 @@ export function applyTicketStatus(embed: EmbedBuilder, ticket: Ticket): EmbedBui
   return embed;
 }
 
-/** Builds the embed posted on ticket creation (status is always "open" at this point). */
+/** Builds the embed posted on ticket creation: welcome text + each question and its answer. */
 export function buildTicketEmbed(
   ticket: Ticket,
   ticketType: TicketTypeConfig,
-  details: string,
+  answers: { label: string; answer: string }[],
   creator: User,
   openMessage: string
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(ticketType.displayName)
     .setDescription(openMessage.slice(0, 2000))
-    .addFields({ name: "Response", value: details.trim().slice(0, 1024) || "*(no response provided)*" })
     .setFooter({
       text: `${creator.username} (${creator.id}) • ${ticket.code ?? `#${ticket.id}`}`,
       iconURL: creator.displayAvatarURL(),
     })
     .setTimestamp(ticket.createdAt);
+
+  // One field per question. Discord caps a message at 25 fields; questions cap at 5.
+  for (const { label, answer } of answers) {
+    embed.addFields({
+      name: label.slice(0, 256),
+      value: (answer.trim() || "*Not provided*").slice(0, 1024),
+    });
+  }
 
   return applyTicketStatus(embed, ticket);
 }

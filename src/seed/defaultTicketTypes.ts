@@ -1,4 +1,5 @@
 import { ensureTicketType } from "../db/ticketConfigRepo";
+import { seedDefaultQuestions } from "./defaultQuestions";
 
 export interface TicketTypeSeed {
   typeKey: string;
@@ -56,5 +57,6 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
 export function seedDefaultTicketTypes(guildId: string): void {
   for (const seed of DEFAULT_TICKET_TYPES) {
     ensureTicketType({ guildId, ...seed });
+    seedDefaultQuestions(guildId, seed.typeKey);
   }
 }
