@@ -23,6 +23,7 @@ import {
 } from "../db/ticketRepo";
 import { getQuestions } from "../db/questionRepo";
 import { saveAnswers } from "../db/answerRepo";
+import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
@@ -32,7 +33,9 @@ import {
   buildTranscriptLogEmbed,
 } from "../utils/ticketEmbeds";
 import { buildTicketDetailsModal, questionFieldId } from "../utils/ticketModal";
-import { canManageTicket } from "../utils/permissions";
+import { canClaim, canClose, canUnclaim } from "../utils/ticketAuth";
+import { recordAudit, recordClaimHistory } from "../db/auditRepo";
+import { applyClaimChange } from "../utils/claimActions";
 import { generateTranscript } from "../utils/transcript";
 import {
   TICKET_CLAIM_PREFIX,
@@ -40,6 +43,8 @@ import {
   TICKET_CLOSE_CONFIRM_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_TAKEOVER_PREFIX,
+  TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
 
 export {
@@ -48,6 +53,8 @@ export {
   TICKET_CLOSE_CONFIRM_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_TAKEOVER_PREFIX,
+  TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
 
 /** Looks up a ticket and its type config from a button/modal customId's numeric suffix. */
@@ -59,9 +66,14 @@ function resolveTicketAndType(ticketId: number) {
   return { ticket, ticketType };
 }
 
-/** Can this user claim/close a ticket: a configured lead, a Manage Server holder, or (for close) the creator. */
-function canManage(interaction: ButtonInteraction, ticketConfigId: number): boolean {
-  return canManageTicket(interaction.user.id, interaction.memberPermissions, ticketConfigId);
+/** Builds the auth context (user + live perms + ticket + type) used by the ticketAuth helpers. */
+function authCtx(interaction: ButtonInteraction, ticket: Ticket, ticketType: TicketTypeConfig) {
+  return {
+    userId: interaction.user.id,
+    permissions: interaction.memberPermissions,
+    ticket,
+    ticketType,
+  };
 }
 
 /** Modal submit for /ticket create and the panel select menu: creates the private channel and the ticket row. */
@@ -183,7 +195,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
         openMessage
       ),
     ],
-    components: [buildTicketButtons(ticket.id, false, false)],
+    components: [buildTicketButtons(ticket)],
   });
   setMessageId(ticket.id, message.id);
 
@@ -257,23 +269,39 @@ export async function handleTicketClaim(interaction: ButtonInteraction) {
     return;
   }
 
-  if (!canManage(interaction, ticketType.id)) {
+  if (!canClaim(authCtx(interaction, ticket, ticketType))) {
     await interaction.reply({
-      content: "Only assigned leads (or a server admin) can claim this ticket.",
+      content: "Only assigned staff, a Ticket Manager, or a server admin can claim this ticket.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   const claimed = claimTicket(ticketId, interaction.user.id);
-  if (!claimed) return;
+  if (!claimed) {
+    await interaction.reply({
+      content: "That ticket was just claimed by someone else.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  recordClaimHistory(ticketId, null, interaction.user.id, interaction.user.id, "claim");
+  recordAudit({
+    guildId: claimed.guildId,
+    ticketId: claimed.id,
+    ticketCode: claimed.code ?? undefined,
+    actorId: interaction.user.id,
+    targetId: interaction.user.id,
+    eventType: "claim",
+    newValue: interaction.user.id,
+  });
 
   const baseEmbed = interaction.message.embeds[0]
     ? EmbedBuilder.from(interaction.message.embeds[0])
     : new EmbedBuilder();
   await interaction.update({
     embeds: [applyTicketStatus(baseEmbed, claimed)],
-    components: [buildTicketButtons(ticketId, true, false)],
+    components: [buildTicketButtons(claimed)],
   });
 
   const claimMessage = resolveTemplate(ticketType.claimMessage, {
@@ -283,6 +311,63 @@ export async function handleTicketClaim(interaction: ButtonInteraction) {
   });
   // Explicit creator ping so they get a notification even if the template omits {creator}.
   await interaction.followUp({ content: `<@${claimed.creatorId}> ${claimMessage}` });
+}
+
+/** Unclaim button: the current claimant (or a manager) releases the ticket back to open. */
+export async function handleTicketUnclaim(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_UNCLAIM_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (ticket.status !== "claimed") {
+    await interaction.reply({ content: "This ticket isn't currently claimed.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!canUnclaim(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({
+      content: "Only the current claimant, a Ticket Manager, or a server admin can unclaim this ticket.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await interaction.deferUpdate();
+  await applyClaimChange(interaction.client, ticket, ticketType, null, interaction.user.id, "unclaim");
+}
+
+/** Take Over button: staff or a manager (not the current claimant) grabs a claimed ticket. */
+export async function handleTicketTakeover(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_TAKEOVER_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (ticket.status !== "claimed") {
+    await interaction.reply({ content: "This ticket isn't currently claimed.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (ticket.claimedBy === interaction.user.id) {
+    await interaction.reply({ content: "You already have this ticket claimed.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  // Taking over requires the same standing as claiming (assigned staff or a manager).
+  if (!canClaim(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({
+      content: "Only assigned staff, a Ticket Manager, or a server admin can take over this ticket.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await interaction.deferUpdate();
+  await applyClaimChange(interaction.client, ticket, ticketType, interaction.user.id, interaction.user.id, "takeover");
 }
 
 /** Close button, step 1: asks for confirmation before anything happens. */
@@ -303,8 +388,7 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
     return;
   }
 
-  const allowed = canManage(interaction, ticketType.id) || interaction.user.id === ticket.creatorId;
-  if (!allowed) {
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
     await interaction.reply({
       content: "You don't have permission to close this ticket.",
       flags: MessageFlags.Ephemeral,
@@ -339,8 +423,7 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
     return;
   }
 
-  const allowed = canManage(interaction, ticketType.id) || interaction.user.id === ticket.creatorId;
-  if (!allowed) {
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
     await interaction.update({ content: "You don't have permission to close this ticket.", components: [] });
     return;
   }
@@ -380,7 +463,7 @@ export async function handleTicketCloseConfirm(interaction: ButtonInteraction) {
       await originalMessage
         .edit({
           embeds: [applyTicketStatus(baseEmbed, closed)],
-          components: [buildTicketButtons(ticketId, true, true)],
+          components: [buildTicketButtons(closed)],
         })
         .catch(() => null);
     }

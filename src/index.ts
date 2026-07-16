@@ -3,7 +3,7 @@ import { config } from "./config";
 import { commands } from "./commands";
 import { handleInteraction } from "./events/interactionCreate";
 import { seedDefaultTicketTypes } from "./seed/defaultTicketTypes";
-import { releaseClaimsForDepartedMember } from "./utils/staffLifecycle";
+import { reconcileClaimsOnStartup, releaseClaimsForDepartedMember } from "./utils/staffLifecycle";
 import "./db/connect";
 
 process.on("unhandledRejection", (reason) => {
@@ -33,6 +33,9 @@ client.once(Events.ClientReady, (readyClient) => {
   seedDefaultTicketTypes(config.guildId);
   console.log(
     `Logged in as ${readyClient.user.tag} — ${commandsByName.size} commands loaded, serving guild ${config.guildId}`
+  );
+  void reconcileClaimsOnStartup(readyClient, config.guildId).catch((error) =>
+    console.error("[startup] claim reconciliation failed:", error)
   );
 });
 

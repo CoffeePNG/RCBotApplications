@@ -13,6 +13,8 @@ import {
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_PANEL_SELECT_ID,
+  TICKET_TAKEOVER_PREFIX,
+  TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
 import {
   handleTicketClaim,
@@ -21,6 +23,8 @@ import {
   handleTicketCloseRequest,
   handleTicketCreateModal,
   handleTicketPanelSelect,
+  handleTicketTakeover,
+  handleTicketUnclaim,
 } from "../handlers/ticketHandler";
 import {
   Q_ADD,
@@ -100,6 +104,10 @@ export async function handleInteraction(
         await handleTicketCloseRequest(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaim(interaction);
+      } else if (interaction.customId.startsWith(TICKET_UNCLAIM_PREFIX)) {
+        await handleTicketUnclaim(interaction);
+      } else if (interaction.customId.startsWith(TICKET_TAKEOVER_PREFIX)) {
+        await handleTicketTakeover(interaction);
       } else if (QUESTION_BUTTON_PREFIXES.some((p) => interaction.customId.startsWith(p))) {
         await handleQuestionButton(interaction);
       }

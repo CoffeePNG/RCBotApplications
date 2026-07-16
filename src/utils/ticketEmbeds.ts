@@ -10,6 +10,8 @@ import {
   TICKET_CLOSE_CANCEL_PREFIX,
   TICKET_CLOSE_CONFIRM_PREFIX,
   TICKET_CLOSE_PREFIX,
+  TICKET_TAKEOVER_PREFIX,
+  TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
 import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
@@ -64,24 +66,45 @@ export function buildTicketEmbed(
   return applyTicketStatus(embed, ticket);
 }
 
-/** Claim/Close buttons shown on a ticket's message; each disables once it no longer applies. */
-export function buildTicketButtons(
-  ticketId: number,
-  claimDisabled: boolean,
-  closeDisabled: boolean
-): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+/**
+ * The action buttons on a ticket's message, derived from its current status:
+ * - open: [Claim, Close]
+ * - claimed: [Unclaim, Take Over, Close]
+ * - closing/closed: [Close (disabled)]
+ */
+export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuilder> {
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  const closed =
+    ticket.status === "closed" || ticket.status === "closing" || ticket.status === "closing_failed";
+
+  if (ticket.status === "open") {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_CLAIM_PREFIX}${ticket.id}`)
+        .setLabel("Claim")
+        .setStyle(ButtonStyle.Primary)
+    );
+  } else if (ticket.status === "claimed") {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_UNCLAIM_PREFIX}${ticket.id}`)
+        .setLabel("Unclaim")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_TAKEOVER_PREFIX}${ticket.id}`)
+        .setLabel("Take Over")
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+
+  row.addComponents(
     new ButtonBuilder()
-      .setCustomId(`${TICKET_CLAIM_PREFIX}${ticketId}`)
-      .setLabel("Claim")
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(claimDisabled),
-    new ButtonBuilder()
-      .setCustomId(`${TICKET_CLOSE_PREFIX}${ticketId}`)
+      .setCustomId(`${TICKET_CLOSE_PREFIX}${ticket.id}`)
       .setLabel("Close")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(closeDisabled)
+      .setDisabled(closed)
   );
+  return row;
 }
 
 /** Confirm/Cancel buttons shown on the ephemeral "are you sure?" close prompt. */

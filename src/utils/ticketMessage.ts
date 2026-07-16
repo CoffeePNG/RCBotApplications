@@ -43,9 +43,7 @@ export async function updateTicketMessage(
   if (!message) return;
 
   const embed = await rebuildTicketEmbed(client, ticket, ticketType);
-  const closed = ticket.status === "closed" || ticket.status === "closing" || ticket.status === "closing_failed";
-  const claimDisabled = ticket.status !== "open"; // only an unclaimed/open ticket can be claimed
   await message
-    .edit({ embeds: [embed], components: [buildTicketButtons(ticket.id, claimDisabled, closed)] })
+    .edit({ embeds: [embed], components: [buildTicketButtons(ticket)] })
     .catch(() => null);
 }

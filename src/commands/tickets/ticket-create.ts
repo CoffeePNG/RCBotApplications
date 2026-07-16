@@ -5,14 +5,16 @@ import {
   MessageFlags,
   TextChannel,
 } from "discord.js";
-import { getTicketType } from "../../db/ticketConfigRepo";
+import { getLeads, getTicketType } from "../../db/ticketConfigRepo";
 import { getTicketByChannel } from "../../db/ticketRepo";
+import { isManagerAssigned } from "../../db/managerRepo";
 import { addParticipant, removeParticipant } from "../../db/participantRepo";
 import { recordAudit } from "../../db/auditRepo";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
 import { buildTicketDetailsModal } from "../../utils/ticketModal";
 import { grantChannelAccess, revokeChannelAccess } from "../../utils/ticketPermissions";
-import { canManageParticipants, hasResidualTicketAccess } from "../../utils/ticketAuth";
+import { applyClaimChange } from "../../utils/claimActions";
+import { canAssign, canManageParticipants, canUnclaim, hasResidualTicketAccess } from "../../utils/ticketAuth";
 import { Command } from "../types";
 
 export const ticketCreateCommand: Command = {
@@ -42,6 +44,15 @@ export const ticketCreateCommand: Command = {
         .setName("remove")
         .setDescription("Remove a participant you previously added to this ticket.")
         .addUserOption((opt) => opt.setName("user").setDescription("The user to remove").setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub.setName("unclaim").setDescription("Release this ticket back to open (claimant or a manager).")
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("assign")
+        .setDescription("Assign this ticket to a specific staff member.")
+        .addUserOption((opt) => opt.setName("user").setDescription("The staff member to assign").setRequired(true))
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -56,6 +67,7 @@ export const ticketCreateCommand: Command = {
 
     const sub = interaction.options.getSubcommand();
     if (sub === "create") return handleCreate(interaction, guildId);
+    if (sub === "unclaim" || sub === "assign") return handleClaimChange(interaction, guildId, sub);
     return handleParticipant(interaction, guildId, sub);
   },
 
@@ -172,4 +184,72 @@ async function handleParticipant(
     content: removed ? `Removed ${user.tag} from this ticket.` : `${user.tag} isn't a participant you can remove.`,
     flags: MessageFlags.Ephemeral,
   });
+}
+
+async function handleClaimChange(
+  interaction: ChatInputCommandInteraction,
+  guildId: string,
+  sub: string
+): Promise<void> {
+  const channel = interaction.channel;
+  const ticket = channel ? getTicketByChannel(channel.id) : null;
+  if (!ticket) {
+    await interaction.reply({ content: "Run this inside a ticket channel.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const ticketType = getTicketType(guildId, ticket.typeKey);
+  if (!ticketType) {
+    await interaction.reply({ content: "This ticket's type no longer exists.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (ticket.status !== "claimed") {
+    await interaction.reply({
+      content: ticket.status === "open" ? "This ticket isn't claimed yet." : "This ticket is closed.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const ctx = { userId: interaction.user.id, permissions: interaction.memberPermissions, ticket, ticketType };
+
+  if (sub === "unclaim") {
+    if (!canUnclaim(ctx)) {
+      await interaction.reply({
+        content: "Only the current claimant, a Ticket Manager, or a server admin can unclaim this ticket.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await applyClaimChange(interaction.client, ticket, ticketType, null, interaction.user.id, "unclaim");
+    await interaction.reply({ content: "Ticket unclaimed.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  // assign
+  if (!canAssign(ctx)) {
+    await interaction.reply({
+      content: "Only the current claimant, a Ticket Manager, or a server admin can reassign this ticket.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const target = interaction.options.getUser("user", true);
+  if (target.bot) {
+    await interaction.reply({ content: "You can't assign a ticket to a bot.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  // The assignee must have standing to work the ticket: assigned staff or a manager.
+  const eligible = getLeads(ticketType.id).includes(target.id) || isManagerAssigned(guildId, target.id);
+  if (!eligible) {
+    await interaction.reply({
+      content: `${target.tag} isn't staff for **${ticketType.displayName}** or a Ticket Manager, so they can't be assigned.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  if (target.id === ticket.claimedBy) {
+    await interaction.reply({ content: `${target.tag} already has this ticket claimed.`, flags: MessageFlags.Ephemeral });
+    return;
+  }
+  await applyClaimChange(interaction.client, ticket, ticketType, target.id, interaction.user.id, "assign");
+  await interaction.reply({ content: `Assigned this ticket to ${target.tag}.`, flags: MessageFlags.Ephemeral });
 }
