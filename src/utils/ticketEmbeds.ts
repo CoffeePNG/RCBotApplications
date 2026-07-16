@@ -44,7 +44,7 @@ export function buildTicketEmbed(
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle(ticketType.displayName)
-    .setDescription(details.slice(0, 4000))
+    .setDescription(`**Here is the user's response:**\n${details.slice(0, 3900)}`)
     .addFields({ name: "Opened by", value: `${creatorTag} (<@${ticket.creatorId}>)` })
     .setFooter({ text: `Ticket #${ticket.id} • ${ticketType.department}` })
     .setTimestamp(ticket.createdAt);

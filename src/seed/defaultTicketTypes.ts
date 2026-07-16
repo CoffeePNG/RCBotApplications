@@ -10,13 +10,17 @@ export interface TicketTypeSeed {
   optionDescription: string;
 }
 
+const DEFAULT_OPEN_MESSAGE =
+  "Thanks for opening a ticket! We've got it logged and a staff member will be with you as soon as possible. " +
+  "If you have any extra details or screenshots that'd help us out, feel free to drop them here in the meantime.";
+
 export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
   {
     typeKey: "application",
     displayName: "Staff Application",
     department: "leadership",
     channelPrefix: "application",
-    openMessage: "Thanks for applying! A member of the team will be with you shortly.",
+    openMessage: DEFAULT_OPEN_MESSAGE,
     claimMessage: "{claimant} has claimed this application and will be reviewing it.",
     optionDescription: "Apply to join the staff team.",
   },
@@ -25,8 +29,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     displayName: "Bug Report",
     department: "development",
     channelPrefix: "bug",
-    openMessage:
-      "Thanks for the report! A member of the team will be with you shortly. Please include steps to reproduce, plus any screenshots or logs.",
+    openMessage: DEFAULT_OPEN_MESSAGE,
     claimMessage: "{claimant} has claimed this bug report and is looking into it.",
     optionDescription: "Report a bug or glitch you've run into.",
   },
@@ -35,8 +38,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     displayName: "Appeal",
     department: "moderation",
     channelPrefix: "appeal",
-    openMessage:
-      "Thanks — a member of the team will review your appeal shortly. Please explain what you're appealing and why.",
+    openMessage: DEFAULT_OPEN_MESSAGE,
     claimMessage: "{claimant} has claimed this appeal and will be reviewing it.",
     optionDescription: "Appeal a ban, mute, or other moderation action.",
   },
@@ -45,8 +47,7 @@ export const DEFAULT_TICKET_TYPES: TicketTypeSeed[] = [
     displayName: "Help Request",
     department: "support",
     channelPrefix: "help",
-    openMessage:
-      "Thanks for reaching out! A member of the team will be with you shortly. Describe what you need help with.",
+    openMessage: DEFAULT_OPEN_MESSAGE,
     claimMessage: "{claimant} has claimed this help request.",
     optionDescription: "Get help with anything else.",
   },
