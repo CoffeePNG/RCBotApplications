@@ -81,7 +81,13 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   const leads = getLeads(ticketType.id);
 
   // Create the ticket row first so its unique code (used as the channel name) exists.
-  const ticket = createTicket(guildId, typeKey, interaction.user.id, ticketType.channelPrefix);
+  const ticket = createTicket(
+    guildId,
+    typeKey,
+    interaction.user.id,
+    ticketType.channelPrefix,
+    interaction.user.username
+  );
   const channelName = ticket.code ?? `ticket-${ticket.id}`;
 
   const overwrites: OverwriteResolvable[] = [

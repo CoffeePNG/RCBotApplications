@@ -1,5 +1,6 @@
 import { db } from "./connect";
 import { Ticket, TicketStatus } from "../types/ticket";
+import { slugify } from "../utils/ticketFormatter";
 
 function rowToTicket(row: any): Ticket {
   return {
@@ -19,28 +20,29 @@ function rowToTicket(row: any): Ticket {
   };
 }
 
-/** Builds a `<prefix>-<yyyymmdd>-<5 letters>` code that isn't already used by another ticket. */
-function generateUniqueCode(prefix: string): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+/** Builds a `<prefix>-<username>-<5 digits>` code that isn't already used by another ticket. */
+function generateUniqueCode(prefix: string, username: string): string {
+  const namePart = slugify(username);
   const codeExists = db.prepare(`SELECT 1 FROM tickets WHERE code = ?`);
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const letters = Array.from({ length: 5 }, () =>
-      String.fromCharCode(97 + Math.floor(Math.random() * 26))
-    ).join("");
-    const code = `${prefix}-${date}-${letters}`;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const digits = Math.floor(Math.random() * 100000)
+      .toString()
+      .padStart(5, "0");
+    const code = `${prefix}-${namePart}-${digits}`;
     if (!codeExists.get(code)) return code;
   }
-  // Fall back to a timestamp suffix in the astronomically unlikely event of repeated collisions.
-  return `${prefix}-${date}-${Date.now().toString(36)}`;
+  // Fall back to a longer number in the astronomically unlikely event of repeated collisions.
+  return `${prefix}-${namePart}-${Date.now().toString().slice(-8)}`;
 }
 
 export function createTicket(
   guildId: string,
   typeKey: string,
   creatorId: string,
-  codePrefix: string
+  codePrefix: string,
+  username: string
 ): Ticket {
-  const code = generateUniqueCode(codePrefix);
+  const code = generateUniqueCode(codePrefix, username);
   const info = db
     .prepare(
       `INSERT INTO tickets (guild_id, type_key, creator_id, channel_id, code, status, created_at)
