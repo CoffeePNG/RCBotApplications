@@ -11,17 +11,10 @@ import { isManagerAssigned } from "../../db/managerRepo";
 import { addParticipant, removeParticipant } from "../../db/participantRepo";
 import { recordAudit } from "../../db/auditRepo";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
-import { buildTicketDetailsModal } from "../../utils/ticketModal";
 import { grantChannelAccess, revokeChannelAccess } from "../../utils/ticketPermissions";
 import { applyClaimChange } from "../../utils/claimActions";
-import {
-  MAX_OPEN_TICKETS_PER_USER,
-  canAssign,
-  canManageParticipants,
-  canOpenNewTicket,
-  canUnclaim,
-  hasResidualTicketAccess,
-} from "../../utils/ticketAuth";
+import { showTicketCreateModal } from "../../handlers/ticketHandler";
+import { canAssign, canManageParticipants, canUnclaim, hasResidualTicketAccess } from "../../utils/ticketAuth";
 import { Command } from "../types";
 
 export const ticketCreateCommand: Command = {
@@ -93,31 +86,8 @@ async function handleCreate(interaction: ChatInputCommandInteraction, guildId: s
     });
     return;
   }
-  if (!ticketType.enabled) {
-    await interaction.reply({
-      content: `**${ticketType.displayName}** tickets are currently closed.`,
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  if (!canOpenNewTicket(guildId, interaction.user.id, interaction.memberPermissions)) {
-    await interaction.reply({
-      content: `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`,
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  const modal = buildTicketDetailsModal(ticketType);
-  if (!modal) {
-    await interaction.reply({
-      content: `**${ticketType.displayName}** isn't ready yet — no questions are configured. Please contact an admin.`,
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  await interaction.showModal(modal);
+  // The enabled / cap / questions guards + modal all live in one shared helper.
+  await showTicketCreateModal(interaction, guildId, ticketType);
 }
 
 async function handleParticipant(

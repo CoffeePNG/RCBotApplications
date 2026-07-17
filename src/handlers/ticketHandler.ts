@@ -40,7 +40,7 @@ import {
   questionFieldId,
 } from "../utils/ticketModal";
 import { outcomeByIndex } from "../utils/closeOutcomes";
-import { MAX_OPEN_TICKETS_PER_USER, canClaim, canClose, canOpenNewTicket, canUnclaim } from "../utils/ticketAuth";
+import { TICKET_CAP_MESSAGE, canClaim, canClose, canOpenNewTicket, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
@@ -112,10 +112,7 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
 
   // Authoritative cap check (the pre-modal check can race if two modals are opened).
   if (!canOpenNewTicket(guildId, interaction.user.id, interaction.memberPermissions)) {
-    await interaction.reply({
-      content: `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`,
-      flags: MessageFlags.Ephemeral,
-    });
+    await interaction.reply({ content: TICKET_CAP_MESSAGE, flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -236,19 +233,16 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   });
 }
 
-/** Ticket panel's select menu: same details modal as /ticket create, for whichever type was picked. */
-export async function handleTicketPanelSelect(interaction: StringSelectMenuInteraction) {
-  const guildId = interaction.guildId;
-  if (!guildId) return;
-
-  const ticketType = getTicketType(guildId, interaction.values[0]);
-  if (!ticketType) {
-    await interaction.reply({
-      content: "This ticket type is no longer configured.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
+/**
+ * Shared entry for both `/ticket create` and the panel dropdown: runs the open
+ * guards (type enabled, under the per-user cap, questions configured) and shows
+ * the create modal. Callers only need to resolve the ticket type first.
+ */
+export async function showTicketCreateModal(
+  interaction: ChatInputCommandInteraction | StringSelectMenuInteraction,
+  guildId: string,
+  ticketType: TicketTypeConfig
+): Promise<void> {
   if (!ticketType.enabled) {
     await interaction.reply({
       content: `**${ticketType.displayName}** tickets are currently closed.`,
@@ -258,10 +252,7 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
   }
 
   if (!canOpenNewTicket(guildId, interaction.user.id, interaction.memberPermissions)) {
-    await interaction.reply({
-      content: `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`,
-      flags: MessageFlags.Ephemeral,
-    });
+    await interaction.reply({ content: TICKET_CAP_MESSAGE, flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -274,6 +265,22 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
     return;
   }
   await interaction.showModal(modal);
+}
+
+/** Ticket panel's select menu: resolves the picked type, then shows the create modal. */
+export async function handleTicketPanelSelect(interaction: StringSelectMenuInteraction) {
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const ticketType = getTicketType(guildId, interaction.values[0]);
+  if (!ticketType) {
+    await interaction.reply({
+      content: "This ticket type is no longer configured.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await showTicketCreateModal(interaction, guildId, ticketType);
 }
 
 /** Claim button: locks the ticket to one lead (or Manage Server holder) and pings the creator. */

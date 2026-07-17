@@ -10,6 +10,9 @@ type Perms = PermissionsBitField | Readonly<PermissionsBitField> | null | undefi
 /** Max simultaneously-open tickets a non-staff member may have. Staff are exempt. */
 export const MAX_OPEN_TICKETS_PER_USER = 3;
 
+/** The message shown when a non-staff member hits the open-ticket cap. */
+export const TICKET_CAP_MESSAGE = `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`;
+
 /** Discord admin override — Manage Server or Administrator, checked live from current perms. */
 export function hasAdminOverride(permissions: Perms): boolean {
   return (
