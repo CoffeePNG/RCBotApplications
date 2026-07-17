@@ -93,16 +93,18 @@ staff team.") — falls back to `department` if not set.
   a `Manage Server` holder — *not* the ticket creator). Clicking it shows a row
   of outcome buttons (**Approved / Denied / Withdrawn / No Response / Other**);
   picking one pops a small optional-reason note. The channel is then **moved to
-  the archive category**, everyone but staff/managers loses access, and the
-  buttons become a single **Delete Channel** button. The channel is kept so
-  staff can still review it.
-- **Reopen** button (on a closed ticket) — reverts it to active, moves the
+  the archive category** but everyone keeps their access, and the buttons become
+  **Reopen / Make Staff Only / Delete Channel**.
+- **Reopen** button (staff only) — reverts a closed ticket to active, moves the
   channel back to the normal ticket category, and restores the creator's /
-  participants' access. Staff only.
-- **Delete Channel** button — a **two-step** delete: it asks for confirmation
-  first, then posts the full transcript to the archive channel, **verifies** it
-  landed, and only then deletes the channel. A failed archive keeps the channel
-  so nothing is lost. Staff only.
+  participants' access.
+- **Make Staff Only** button (staff only) — removes the creator and participants
+  from a closed channel so only staff/managers can see it. (Close no longer does
+  this automatically — you choose when to lock it down.)
+- **Delete Channel** button (staff only) — a **two-step** delete: it asks for
+  confirmation first, then posts the full transcript to the archive channel,
+  **verifies** it landed, and only then deletes the channel. A failed archive
+  keeps the channel so nothing is lost.
 - `/transcript` — post a transcript of the current ticket channel to the archive
   channel at any time (staff/claimant/manager/creator).
 - `/ticket unclaim` / `/ticket assign user:<user>` — release or reassign the
@@ -165,9 +167,10 @@ via `/mod-config log-channel`, if configured.
 ## Ticket archive logs
 
 Closing a ticket is a two-stage process. **Close** moves the channel into the
-archive category (`/ticket-config archive-category`) and strips access from
-everyone but staff/managers, so the team can still review it. **Delete Channel**
-(or `/transcript` at any time) posts to the resolved archive channel (the shared
+archive category (`/ticket-config archive-category`) but keeps everyone's access;
+staff can then use **Make Staff Only** to hide it from non-staff, **Reopen** it,
+or **Delete Channel**. **Delete Channel** (or `/transcript` at any time) posts to
+the resolved archive channel (the shared
 `/ticket-config archive-channel`, or the type's per-type review channel): one
 summary embed — titled `<Ticket Type> — <code>`, with Opened/Claimed/Closed-by,
 **outcome**, optional **reason**, duration, and a per-person message count (not

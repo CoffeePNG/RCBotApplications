@@ -13,6 +13,7 @@ import {
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_REOPEN_PREFIX,
+  TICKET_STAFFONLY_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
@@ -87,6 +88,11 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
         .setCustomId(`${TICKET_REOPEN_PREFIX}${ticket.id}`)
         .setLabel("Reopen")
         .setStyle(ButtonStyle.Success)
+        .setDisabled(done),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_STAFFONLY_PREFIX}${ticket.id}`)
+        .setLabel("Make Staff Only")
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(done),
       new ButtonBuilder()
         .setCustomId(`${TICKET_DELETE_PREFIX}${ticket.id}`)

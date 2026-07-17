@@ -47,7 +47,7 @@ import { TICKET_CAP_MESSAGE, canClaim, canClose, canOpenNewTicket, canUnclaim } 
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
-import { archiveTicketChannel, restoreTicketChannel } from "../utils/ticketPermissions";
+import { makeChannelStaffOnly, moveToArchiveCategory, restoreTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
 import { buildPanelContent } from "../utils/ticketPanel";
 import {
@@ -59,6 +59,7 @@ import {
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_REOPEN_PREFIX,
+  TICKET_STAFFONLY_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -524,20 +525,49 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
     newValue: outcome ?? undefined,
   });
 
-  // Park in the archive category and strip access from everyone but staff/managers.
-  await archiveTicketChannel(channel, closed);
+  // Park in the archive category, but leave everyone's access intact — staff can
+  // lock it down later with "Make Staff Only".
+  await moveToArchiveCategory(channel, closed);
   await updateTicketMessage(interaction.client, closed, ticketType);
 
   await channel
     .send(
       `This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}. ` +
-        "It's been archived for staff. Use `/transcript` for a log, or **Delete Channel** to remove it."
+        "Staff can **Reopen** it, **Make Staff Only** to hide it from non-staff, or **Delete Channel** to remove it."
     )
     .catch(() => null);
 
   await interaction.editReply({
-    content: "Ticket closed and archived. It's now staff-only — use **Delete Channel** when you're done with it.",
+    content: "Ticket closed. Everyone still has access — use **Make Staff Only** to lock it down, or **Delete Channel** when you're done.",
   });
+}
+
+/** "Make Staff Only" button: removes the creator/participants from a closed ticket channel. */
+export async function handleTicketMakeStaffOnly(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_STAFFONLY_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({ content: "Only staff can do that.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const channel = interaction.channel;
+  if (!(channel instanceof TextChannel)) {
+    await interaction.reply({ content: "This ticket's channel is unavailable.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.deferUpdate();
+  await makeChannelStaffOnly(channel, ticket);
+  await channel
+    .send(`<@${interaction.user.id}> made this channel staff-only. Non-staff can no longer see it.`)
+    .catch(() => null);
 }
 
 /**

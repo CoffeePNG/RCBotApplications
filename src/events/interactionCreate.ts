@@ -17,6 +17,7 @@ import {
   TICKET_OUTCOME_PREFIX,
   TICKET_PANEL_SELECT_ID,
   TICKET_REOPEN_PREFIX,
+  TICKET_STAFFONLY_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
@@ -28,6 +29,7 @@ import {
   handleTicketDelete,
   handleTicketDeleteCancel,
   handleTicketDeleteConfirm,
+  handleTicketMakeStaffOnly,
   handleTicketOutcomeSelect,
   handleTicketPanelSelect,
   handleTicketReopen,
@@ -118,6 +120,8 @@ export async function handleInteraction(
         await handleTicketTakeover(interaction);
       } else if (interaction.customId.startsWith(TICKET_REOPEN_PREFIX)) {
         await handleTicketReopen(interaction);
+      } else if (interaction.customId.startsWith(TICKET_STAFFONLY_PREFIX)) {
+        await handleTicketMakeStaffOnly(interaction);
       } else if (interaction.customId.startsWith(TICKET_DELETE_CONFIRM_PREFIX)) {
         await handleTicketDeleteConfirm(interaction);
       } else if (interaction.customId.startsWith(TICKET_DELETE_CANCEL_PREFIX)) {

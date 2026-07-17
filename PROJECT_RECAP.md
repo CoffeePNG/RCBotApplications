@@ -45,15 +45,16 @@ storing everything in a local SQLite file.
 3. **Close** — **staff only** (assigned staff, the claimant, or a manager; not
    the creator) clicks **Close** → a row of **outcome buttons** (Approved /
    Denied / Withdrawn / No Response / Other) → picking one pops a small
-   optional-reason note. The channel is then **moved to the archive category**
-   and everyone but staff/managers loses access — it's kept for staff review.
-   The buttons become a single **Delete Channel**.
-4. **Reopen or Delete** — a closed ticket shows **Reopen** and **Delete Channel**
-   (staff only). *Reopen* reverts it to active, moves the channel back to the
-   ticket category, and restores creator/participant access. *Delete* is
-   **two-step**: confirm → post the transcript to the archive channel and
-   **verify** it landed → then remove the channel (a failed archive keeps the
-   channel). `/transcript` can dump a transcript any time in between.
+   optional-reason note. The channel is **moved to the archive category** but
+   everyone keeps access. The buttons become **Reopen / Make Staff Only /
+   Delete Channel**.
+4. **Reopen / Make Staff Only / Delete** — all staff only. *Reopen* reverts to
+   active, moves the channel back to the ticket category, and restores
+   creator/participant access. *Make Staff Only* removes the creator/participants
+   so only the team can see it (close no longer does this automatically).
+   *Delete* is **two-step**: confirm → post the transcript to the archive channel
+   and **verify** it landed → then remove the channel (a failed archive keeps
+   the channel). `/transcript` can dump a transcript any time in between.
 
 ### Ticket codes
 

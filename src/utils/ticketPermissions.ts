@@ -96,18 +96,19 @@ export function resolveArchiveChannelId(guildId: string, typeKey: string): strin
   return getTicketType(guildId, typeKey)?.reviewChannelId ?? null;
 }
 
-/**
- * Stage-1 close: parks a ticket channel in the configured archive category (if any)
- * and removes access for everyone but staff/managers — the creator and any added
- * participants lose their overwrites, so only the team can still see it.
- */
-export async function archiveTicketChannel(channel: TextChannel, ticket: Ticket): Promise<void> {
+/** On close: parks a ticket channel in the configured archive category (access unchanged). */
+export async function moveToArchiveCategory(channel: TextChannel, ticket: Ticket): Promise<void> {
   const categoryId = getGuildSettings(ticket.guildId).archiveCategoryId;
   if (categoryId) {
     await channel.setParent(categoryId, { lockPermissions: false }).catch(() => null);
   }
+}
 
-  // Drop the creator and every active participant; staff/manager overwrites remain.
+/**
+ * "Make staff only": removes access for the creator and every active participant,
+ * leaving staff/manager overwrites in place so only the team can still see it.
+ */
+export async function makeChannelStaffOnly(channel: TextChannel, ticket: Ticket): Promise<void> {
   await revokeChannelAccess(channel, ticket.creatorId);
   for (const participant of getActiveParticipants(ticket.id)) {
     await revokeChannelAccess(channel, participant.userId);
