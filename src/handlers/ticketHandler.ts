@@ -532,8 +532,9 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
 
   await channel
     .send(
-      `This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}. ` +
-        "Staff can **Reopen** it, **Make Staff Only** to hide it from non-staff, or **Delete Channel** to remove it."
+      `This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}.` +
+        (reason ? `\n**Note:** ${reason}` : "") +
+        "\nStaff can **Reopen** it, **Make Staff Only** to hide it from non-staff, or **Delete Channel** to remove it."
     )
     .catch(() => null);
 

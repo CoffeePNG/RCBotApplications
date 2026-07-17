@@ -39,6 +39,12 @@ export function applyTicketStatus(embed: EmbedBuilder, ticket: Ticket): EmbedBui
       name: "Closed",
       value: ticket.closedBy ? `by <@${ticket.closedBy}>` : "closed",
     });
+    if (ticket.outcome) {
+      embed.addFields({ name: "Outcome", value: ticket.outcome });
+    }
+    if (ticket.closeReason) {
+      embed.addFields({ name: "Closing note", value: ticket.closeReason.slice(0, 1024) });
+    }
   }
   return embed;
 }
