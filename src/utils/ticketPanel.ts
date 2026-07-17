@@ -19,11 +19,19 @@ export interface PanelContent {
 
 /** Builds the panel embed + ticket-type select menu; null if the guild has no ticket types yet. */
 export function buildPanelContent(guildId: string): PanelContent | null {
-  const types = getTicketTypes(guildId, true);
+  // Show every type — including disabled ones — so members can see what exists.
+  // Discord can't gray out individual options, so closed types are visually
+  // marked and selecting one returns a "currently closed" notice instead of a form.
+  const types = getTicketTypes(guildId);
   if (types.length === 0) return null;
 
   const settings = getGuildSettings(guildId);
-  const typeList = types.map((t) => `**${t.displayName}** — ${t.optionDescription ?? t.department}`).join("\n");
+  const typeList = types
+    .map((t) => {
+      const closed = t.enabled ? "" : " *(closed)*";
+      return `**${t.displayName}**${closed} — ${t.optionDescription ?? t.department}`;
+    })
+    .join("\n");
 
   const description = settings.panelDescription
     ? resolveTemplate(settings.panelDescription, { types: typeList })
@@ -39,9 +47,11 @@ export function buildPanelContent(guildId: string): PanelContent | null {
     .setPlaceholder("Select a ticket type...")
     .addOptions(
       types.map((t) => ({
-        label: t.displayName,
+        label: (t.enabled ? t.displayName : `🔒 ${t.displayName} (Closed)`).slice(0, 100),
         value: t.typeKey,
-        description: (t.optionDescription ?? t.department).slice(0, 100),
+        description: (t.enabled
+          ? t.optionDescription ?? t.department
+          : "Currently closed — not accepting tickets right now").slice(0, 100),
       }))
     );
 
