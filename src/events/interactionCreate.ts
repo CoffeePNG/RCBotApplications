@@ -12,6 +12,7 @@ import {
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_OUTCOME_PREFIX,
   TICKET_PANEL_SELECT_ID,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
@@ -22,6 +23,7 @@ import {
   handleTicketCloseRequest,
   handleTicketCreateModal,
   handleTicketDelete,
+  handleTicketOutcomeSelect,
   handleTicketPanelSelect,
   handleTicketTakeover,
   handleTicketUnclaim,
@@ -98,7 +100,9 @@ export async function handleInteraction(
     }
 
     if (interaction.isButton()) {
-      if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
+      if (interaction.customId.startsWith(TICKET_OUTCOME_PREFIX)) {
+        await handleTicketOutcomeSelect(interaction);
+      } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseRequest(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaim(interaction);

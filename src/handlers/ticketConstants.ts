@@ -5,5 +5,6 @@ export const TICKET_CLAIM_PREFIX = "ticket_claim:";
 export const TICKET_UNCLAIM_PREFIX = "ticket_unclaim:";
 export const TICKET_TAKEOVER_PREFIX = "ticket_takeover:";
 export const TICKET_CLOSE_PREFIX = "ticket_close:";
+export const TICKET_OUTCOME_PREFIX = "ticket_outcome:";
 export const TICKET_CLOSE_MODAL_PREFIX = "ticket_close_modal:";
 export const TICKET_DELETE_PREFIX = "ticket_delete:";

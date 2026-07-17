@@ -29,17 +29,17 @@ import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
+  buildOutcomeButtons,
   buildTicketButtons,
   buildTicketEmbed,
 } from "../utils/ticketEmbeds";
 import {
-  CLOSE_OUTCOME_FIELD,
   CLOSE_REASON_FIELD,
-  buildCloseModal,
+  buildCloseReasonModal,
   buildTicketDetailsModal,
   questionFieldId,
 } from "../utils/ticketModal";
-import { parseOutcome } from "../utils/closeOutcomes";
+import { outcomeByIndex } from "../utils/closeOutcomes";
 import { canClaim, canClose, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
@@ -52,6 +52,7 @@ import {
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_OUTCOME_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -62,6 +63,7 @@ export {
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_OUTCOME_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -379,7 +381,7 @@ export async function handleTicketTakeover(interaction: ButtonInteraction) {
   await applyClaimChange(interaction.client, ticket, ticketType, interaction.user.id, interaction.user.id, "takeover");
 }
 
-/** Close button: opens the structured close modal (outcome + optional reason). */
+/** Close button (staff only): shows the outcome-picker buttons. */
 export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
   const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_PREFIX.length));
   const found = resolveTicketAndType(ticketId);
@@ -399,13 +401,43 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
 
   if (!canClose(authCtx(interaction, ticket, ticketType))) {
     await interaction.reply({
-      content: "You don't have permission to close this ticket.",
+      content: "Only staff, the claimant, or a manager can close this ticket.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  await interaction.showModal(buildCloseModal(ticketId));
+  await interaction.reply({
+    content: "How was this ticket resolved? Pick an outcome to close it:",
+    components: buildOutcomeButtons(ticketId),
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+/** An outcome button was clicked: pop the optional-reason modal (carrying the outcome). */
+export async function handleTicketOutcomeSelect(interaction: ButtonInteraction) {
+  const rest = interaction.customId.slice(TICKET_OUTCOME_PREFIX.length); // "<ticketId>:<index>"
+  const [ticketIdRaw, indexRaw] = rest.split(":");
+  const ticketId = Number(ticketIdRaw);
+  const outcomeIndex = Number(indexRaw);
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (ticket.status === "closed" || ticket.status === "deleted") {
+    await interaction.reply({ content: "This ticket is already closed.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({ content: "You don't have permission to close this ticket.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const outcome = outcomeByIndex(outcomeIndex) ?? "Other";
+  await interaction.showModal(buildCloseReasonModal(ticketId, outcomeIndex, outcome));
 }
 
 /**
@@ -414,7 +446,9 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
  * The channel is kept so staff can still review it; deletion is a separate step.
  */
 export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInteraction) {
-  const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_MODAL_PREFIX.length));
+  const rest = interaction.customId.slice(TICKET_CLOSE_MODAL_PREFIX.length); // "<ticketId>:<index>"
+  const [ticketIdRaw, indexRaw] = rest.split(":");
+  const ticketId = Number(ticketIdRaw);
   const found = resolveTicketAndType(ticketId);
   if (!found) {
     await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
@@ -433,7 +467,7 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
     return;
   }
 
-  const outcome = parseOutcome(safeField(interaction, CLOSE_OUTCOME_FIELD));
+  const outcome = outcomeByIndex(Number(indexRaw)) ?? "Other";
   const reason = safeField(interaction, CLOSE_REASON_FIELD).trim() || null;
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });

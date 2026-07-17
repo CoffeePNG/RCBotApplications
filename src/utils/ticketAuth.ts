@@ -65,13 +65,12 @@ export function canAssign(ctx: Ctx): boolean {
   return manages(ctx) || isClaimant(ctx.ticket, ctx.userId);
 }
 
-/** Close: creator, current claimant, assigned staff, or a manager. */
+/** Close / delete / transcript: assigned staff, the current claimant, or a manager — NOT the creator. */
 export function canClose(ctx: Ctx): boolean {
   return (
     manages(ctx) ||
     isTypeStaff(ctx.ticketType.id, ctx.userId) ||
-    isClaimant(ctx.ticket, ctx.userId) ||
-    isCreator(ctx.ticket, ctx.userId)
+    isClaimant(ctx.ticket, ctx.userId)
   );
 }
 

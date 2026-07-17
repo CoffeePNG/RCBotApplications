@@ -40,12 +40,12 @@ storing everything in a local SQLite file.
    gets pinged. The claimant/manager can also `/ticket unclaim` or
    `/ticket assign @user`; every ownership change is logged in `claim_history`.
    Extra people can be pulled in with `/ticket add @user`.
-3. **Close** — staff, the claimant, a manager, or the creator clicks **Close**
-   → a **modal** collects a structured outcome (Resolved / Approved / Denied /
-   Duplicate / Invalid / Withdrawn / No Response / Other) + optional reason. On
-   submit the channel is **moved to the archive category** and everyone but
-   staff/managers loses access — it's kept for staff review. The buttons become
-   a single **Delete Channel**.
+3. **Close** — **staff only** (assigned staff, the claimant, or a manager; not
+   the creator) clicks **Close** → a row of **outcome buttons** (Approved /
+   Denied / Withdrawn / No Response / Other) → picking one pops a small
+   optional-reason note. The channel is then **moved to the archive category**
+   and everyone but staff/managers loses access — it's kept for staff review.
+   The buttons become a single **Delete Channel**.
 4. **Delete** — **Delete Channel** (or `/transcript` any time) posts the full
    transcript to the archive channel and **verifies** it landed; only then is
    the channel removed. If archiving fails the channel is kept so nothing is
@@ -104,7 +104,7 @@ onto each ticket, so editing a type's questions never rewrites old tickets.
 - **Ticket panel** — a persistent embed + dropdown (Ticket Tool style) that
   members click instead of typing the command. Only shows **open** types.
 - **Claim / Unclaim / Take Over / Close / Delete buttons** on the ticket message
-  (Close opens the outcome+reason modal → archives channel + shows Delete).
+  (Close is staff-only → outcome buttons + optional note → archives + shows Delete).
 - `/transcript` — post a transcript of the current channel to the archive channel.
 - `/ticket unclaim` · `/ticket assign user:<>` — release/reassign the claim.
 - `/ticket add user:<>` · `/ticket remove user:<>` — manage extra participants.

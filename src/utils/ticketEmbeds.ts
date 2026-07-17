@@ -9,9 +9,11 @@ import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_OUTCOME_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
+import { CLOSE_OUTCOMES } from "./closeOutcomes";
 import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
 import { ParticipantCount } from "./transcript";
@@ -113,6 +115,21 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
       .setStyle(ButtonStyle.Danger)
   );
   return row;
+}
+
+/** The outcome-picker buttons shown (ephemerally) after clicking Close. */
+export function buildOutcomeButtons(ticketId: number): ActionRowBuilder<ButtonBuilder>[] {
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  CLOSE_OUTCOMES.forEach((outcome, index) => {
+    if (index % 5 === 0) rows.push(new ActionRowBuilder<ButtonBuilder>());
+    rows[rows.length - 1].addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_OUTCOME_PREFIX}${ticketId}:${index}`)
+        .setLabel(outcome)
+        .setStyle(outcome === "Approved" ? ButtonStyle.Success : outcome === "Denied" ? ButtonStyle.Danger : ButtonStyle.Secondary)
+    );
+  });
+  return rows;
 }
 
 function formatDuration(ms: number): string {

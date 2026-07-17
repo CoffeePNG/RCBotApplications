@@ -5,7 +5,6 @@ import {
   TextInputStyle,
 } from "discord.js";
 import { TICKET_CLOSE_MODAL_PREFIX, TICKET_CREATE_MODAL_PREFIX } from "../handlers/ticketConstants";
-import { CLOSE_OUTCOMES } from "./closeOutcomes";
 import { getQuestions } from "../db/questionRepo";
 import { TicketQuestion, TicketTypeConfig } from "../types/ticket";
 
@@ -42,32 +41,24 @@ export function buildTicketDetailsModal(ticketType: TicketTypeConfig): ModalBuil
   return modal;
 }
 
-export const CLOSE_OUTCOME_FIELD = "outcome";
 export const CLOSE_REASON_FIELD = "reason";
 
-/** The close modal: a structured outcome + an optional free-text reason. */
-export function buildCloseModal(ticketId: number): ModalBuilder {
-  const outcome = new TextInputBuilder()
-    .setCustomId(CLOSE_OUTCOME_FIELD)
-    .setLabel("Outcome")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(false)
-    .setMaxLength(20)
-    .setPlaceholder(CLOSE_OUTCOMES.join(" / ").slice(0, 100));
-
+/**
+ * The optional-reason modal shown after an outcome button is picked. The outcome
+ * index is carried in the customId (`<prefix><ticketId>:<index>`) so the submit
+ * handler knows which outcome was chosen.
+ */
+export function buildCloseReasonModal(ticketId: number, outcomeIndex: number, outcomeLabel: string): ModalBuilder {
   const reason = new TextInputBuilder()
     .setCustomId(CLOSE_REASON_FIELD)
-    .setLabel("Reason (optional)")
+    .setLabel("Reason / note (optional)")
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(false)
     .setMaxLength(1000)
-    .setPlaceholder("A short note on why this ticket is being closed.");
+    .setPlaceholder("Optional — a short note for the record. Leave blank to just close.");
 
   return new ModalBuilder()
-    .setCustomId(`${TICKET_CLOSE_MODAL_PREFIX}${ticketId}`)
-    .setTitle("Close Ticket")
-    .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(outcome),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(reason)
-    );
+    .setCustomId(`${TICKET_CLOSE_MODAL_PREFIX}${ticketId}:${outcomeIndex}`)
+    .setTitle(`Close — ${outcomeLabel}`.slice(0, 45))
+    .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reason));
 }
