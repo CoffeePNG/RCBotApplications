@@ -34,7 +34,9 @@ storing everything in a local SQLite file.
 1. **Create** — a member runs `/ticket create` (or clicks the panel dropdown),
    fills out a modal built from that type's configured questions, and the bot
    creates a private channel with the right permission overwrites, posts a
-   summary embed with Claim/Close buttons, and pings the type's staff.
+   summary embed with Claim/Close buttons, and pings the type's staff. Non-staff
+   members are capped at **3 open tickets** at once (staff/managers exempt),
+   enforced at every open path.
 2. **Claim** — staff or a manager clicks **Claim** (single-claim: locks to one
    person). The button set becomes **Unclaim** / **Take Over**, and the creator
    gets pinged. The claimant/manager can also `/ticket unclaim` or

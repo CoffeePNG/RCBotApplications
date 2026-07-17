@@ -82,7 +82,8 @@ staff team.") — falls back to `department` if not set.
 
 **Tickets**
 - `/ticket create type:<autocomplete>` — anyone; opens a modal built from that
-  type's configured questions, then creates a private ticket channel.
+  type's configured questions, then creates a private ticket channel. Non-staff
+  members are capped at **3 open tickets** at a time (staff/managers are exempt).
 - **Ticket panel** — a persistent embed + dropdown (Ticket Tool style) that
   members click instead of typing a slash command; see below.
 - **Claim** button — restricted to that type's staff, a Ticket Manager, or a

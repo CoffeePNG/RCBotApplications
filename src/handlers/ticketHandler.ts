@@ -40,7 +40,7 @@ import {
   questionFieldId,
 } from "../utils/ticketModal";
 import { outcomeByIndex } from "../utils/closeOutcomes";
-import { canClaim, canClose, canUnclaim } from "../utils/ticketAuth";
+import { MAX_OPEN_TICKETS_PER_USER, canClaim, canClose, canOpenNewTicket, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
@@ -105,6 +105,15 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   if (!ticketType.enabled) {
     await interaction.reply({
       content: `**${ticketType.displayName}** tickets are currently closed.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Authoritative cap check (the pre-modal check can race if two modals are opened).
+  if (!canOpenNewTicket(guildId, interaction.user.id, interaction.memberPermissions)) {
+    await interaction.reply({
+      content: `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`,
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -243,6 +252,14 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
   if (!ticketType.enabled) {
     await interaction.reply({
       content: `**${ticketType.displayName}** tickets are currently closed.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (!canOpenNewTicket(guildId, interaction.user.id, interaction.memberPermissions)) {
+    await interaction.reply({
+      content: `You can only have ${MAX_OPEN_TICKETS_PER_USER} open tickets at a time. Please wait for one to be resolved before opening another.`,
       flags: MessageFlags.Ephemeral,
     });
     return;

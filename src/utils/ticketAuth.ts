@@ -1,10 +1,14 @@
 import { PermissionFlagsBits, PermissionsBitField } from "discord.js";
-import { isLead } from "../db/ticketConfigRepo";
+import { isLead, isLeadOfAnyType } from "../db/ticketConfigRepo";
 import { isActiveParticipant } from "../db/participantRepo";
 import { isManagerAssigned } from "../db/managerRepo";
+import { countActiveTicketsByCreator } from "../db/ticketRepo";
 import { Ticket, TicketTypeConfig } from "../types/ticket";
 
 type Perms = PermissionsBitField | Readonly<PermissionsBitField> | null | undefined;
+
+/** Max simultaneously-open tickets a non-staff member may have. Staff are exempt. */
+export const MAX_OPEN_TICKETS_PER_USER = 3;
 
 /** Discord admin override — Manage Server or Administrator, checked live from current perms. */
 export function hasAdminOverride(permissions: Perms): boolean {
@@ -25,6 +29,17 @@ export function isManager(guildId: string, userId: string, permissions: Perms): 
 
 export function isTypeStaff(ticketConfigId: number, userId: string): boolean {
   return isLead(ticketConfigId, userId);
+}
+
+/** "Staff" for cap purposes: an admin, a Ticket Manager, or a lead of any ticket type. */
+export function isStaffMember(guildId: string, userId: string, permissions: Perms): boolean {
+  return hasAdminOverride(permissions) || isManagerAssigned(guildId, userId) || isLeadOfAnyType(guildId, userId);
+}
+
+/** Whether a user may open another ticket: staff are exempt; everyone else is capped. */
+export function canOpenNewTicket(guildId: string, userId: string, permissions: Perms): boolean {
+  if (isStaffMember(guildId, userId, permissions)) return true;
+  return countActiveTicketsByCreator(guildId, userId) < MAX_OPEN_TICKETS_PER_USER;
 }
 
 export function isCreator(ticket: Ticket, userId: string): boolean {

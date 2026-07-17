@@ -158,6 +158,17 @@ export function getOpenTickets(guildId: string): Ticket[] {
   return rows.map(rowToTicket);
 }
 
+/** How many active (open or claimed) tickets a user currently has open, for the per-user cap. */
+export function countActiveTicketsByCreator(guildId: string, creatorId: string): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count FROM tickets
+       WHERE guild_id = ? AND creator_id = ? AND status IN ('open','claimed')`
+    )
+    .get(guildId, creatorId) as { count: number };
+  return row.count;
+}
+
 export function getActiveTicketsClaimedBy(guildId: string, userId: string): Ticket[] {
   const rows = db
     .prepare(

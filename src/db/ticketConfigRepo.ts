@@ -106,6 +106,18 @@ export function getLeads(ticketConfigId: number): string[] {
   return rows.map((r) => r.user_id);
 }
 
+/** True if the user is staff (a lead) for any ticket type in the guild. */
+export function isLeadOfAnyType(guildId: string, userId: string): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 FROM ticket_leads tl
+       JOIN ticket_configs tc ON tl.ticket_config_id = tc.id
+       WHERE tc.guild_id = ? AND tl.user_id = ? LIMIT 1`
+    )
+    .get(guildId, userId);
+  return !!row;
+}
+
 export function isLead(ticketConfigId: number, userId: string): boolean {
   const row = db
     .prepare(
