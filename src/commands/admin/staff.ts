@@ -102,14 +102,15 @@ export const staffCommand: Command = {
 
     if (sub === "list") {
       const typeKey = interaction.options.getString("type");
-      const types = typeKey ? [getTicketType(guildId, typeKey)].filter((t) => t) : getTicketTypes(guildId);
+      const single = typeKey ? getTicketType(guildId, typeKey) : null;
+      const types = typeKey ? (single ? [single] : []) : getTicketTypes(guildId);
       if (types.length === 0) {
         await interaction.reply({ content: "No ticket types found.", flags: MessageFlags.Ephemeral });
         return;
       }
-      const lines = types.map((t) => {
-        const leads = getLeads(t!.id);
-        return `**${t!.displayName}**: ${leads.length ? leads.map((id) => `<@${id}>`).join(", ") : "*none*"}`;
+      const lines = types.map((type) => {
+        const leads = getLeads(type.id);
+        return `**${type.displayName}**: ${leads.length ? leads.map((id) => `<@${id}>`).join(", ") : "*none*"}`;
       });
       await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
       return;

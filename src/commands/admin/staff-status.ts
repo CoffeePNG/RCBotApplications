@@ -14,7 +14,7 @@ import { Command } from "../types";
 export const staffStatusCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("staff-status")
-    .setDescription("View all ticket types, their leads, and live ticket counts.")
+    .setDescription("View all ticket types, their staff, and live ticket counts.")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(interaction: ChatInputCommandInteraction) {
