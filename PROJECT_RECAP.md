@@ -44,7 +44,7 @@ storing everything in a local SQLite file.
    Extra people can be pulled in with `/ticket add @user`.
 3. **Close** — **staff only** (assigned staff, the claimant, or a manager; not
    the creator) clicks **Close** → a row of **outcome buttons** (Approved /
-   Denied / Withdrawn / No Response / Other) → picking one pops a small
+   Denied / No Response / Other) → picking one pops a small
    optional-reason note. The channel is **moved to the archive category** but
    everyone keeps access. The buttons become **Reopen / Make Staff Only /
    Delete Channel**.

@@ -47,7 +47,7 @@ These were open questions in the spec, resolved as follows:
 | Single- or multi-claim? | Single-claim — one holder at a time. The claimant (or a manager) can **Unclaim** to release it, or eligible staff can **Take Over**; a claimant/manager can also `/ticket assign` it to a specific staff member. Every change is recorded in `claim_history`. |
 | Close vs. delete | **Two stages.** *Close* moves the channel to the archive category and removes everyone but staff/managers (kept for review). *Delete* posts the transcript to the archive channel, verifies it, then removes the channel. `/transcript` can dump a transcript any time in between. |
 | Transcript delivery | Archive channel only — posted as a `.txt` file (split across files if large) to one shared archive channel (`/ticket-config archive-channel`) or, if none is set, that ticket type's per-type review channel. No DM to the creator. |
-| Application approval automation | Status update only — the bot does not assign a role on approval. A human handles onboarding/role assignment separately. `Manage Roles` is intentionally not requested. Closing captures a structured **outcome** (Approved / Denied / Withdrawn / No Response / Other) picked from buttons, plus an optional note. |
+| Application approval automation | Status update only — the bot does not assign a role on approval. A human handles onboarding/role assignment separately. `Manage Roles` is intentionally not requested. Closing captures a structured **outcome** (Approved / Denied / No Response / Other) picked from buttons, plus an optional note. |
 | Auto-close/auto-unclaim inactive tickets | No background scheduler. Tickets stay open/claimed until explicitly closed. Claims are only auto-released when their holder leaves the server (live, plus a startup reconciliation sweep). |
 | Complete set of ticket types? | Application, Bug Report, Appeal, Help Request seeded by default; config schema is generic, so more can be added later without code changes to the pipeline. |
 | Lead notification on new ticket | Leads are pinged (individually, by user ID — there's no role to ping) inside the new ticket channel itself, and a short notice is posted to that type's review channel. |
@@ -91,7 +91,7 @@ staff team.") — falls back to `department` if not set.
   **Take Over**.
 - **Close** button — **staff only** (assigned staff, the claimant, a manager, or
   a `Manage Server` holder — *not* the ticket creator). Clicking it shows a row
-  of outcome buttons (**Approved / Denied / Withdrawn / No Response / Other**);
+  of outcome buttons (**Approved / Denied / No Response / Other**);
   picking one pops a small optional-reason note. The channel is then **moved to
   the archive category** but everyone keeps their access, and the buttons become
   **Reopen / Make Staff Only / Delete Channel**.

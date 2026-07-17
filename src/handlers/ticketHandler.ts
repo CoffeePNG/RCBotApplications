@@ -591,7 +591,7 @@ export async function handleTicketDelete(interaction: ButtonInteraction) {
 
   // Step 1 of the two-step delete: ask for confirmation before doing anything.
   await interaction.reply({
-    content: "Delete this channel for good? The transcript is saved to the archive channel first — this can't be undone.",
+    content: "Are you sure you want to delete this channel? The transcript is saved to the archive channel first, and this can't be undone.",
     components: [buildDeleteConfirmRow(ticketId)],
     flags: MessageFlags.Ephemeral,
   });

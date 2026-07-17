@@ -1,5 +1,5 @@
 /** The structured outcomes a ticket can be closed with (shown as buttons). */
-export const CLOSE_OUTCOMES = ["Approved", "Denied", "Withdrawn", "No Response", "Other"] as const;
+export const CLOSE_OUTCOMES = ["Approved", "Denied", "No Response", "Other"] as const;
 
 export type CloseOutcome = (typeof CLOSE_OUTCOMES)[number];
 
