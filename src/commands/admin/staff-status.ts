@@ -45,19 +45,19 @@ export const staffStatusCommand: Command = {
       value: [
         `Ticket Managers: ${managers.length > 0 ? managers.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
         `Shared archive channel: ${settings.archiveChannelId ? `<#${settings.archiveChannelId}>` : "*not set (per-type review channels used)*"}`,
+        `Archive category: ${settings.archiveCategoryId ? `<#${settings.archiveCategoryId}>` : "*not set (closed channels stay put)*"}`,
       ].join("\n"),
     });
 
     for (const type of types) {
       const leads = getLeads(type.id);
       const counts = getCounts(guildId, type.typeKey);
-      const stuck = counts.closing + counts.closing_failed;
       embed.addFields({
         name: `${type.displayName} — ${type.department} ${type.enabled ? "🟢 open" : "🔴 closed"}`,
         value: [
           `Staff: ${leads.length > 0 ? leads.map((id) => `<@${id}>`).join(", ") : "*none assigned*"}`,
-          `Open: **${counts.open}** · Claimed: **${counts.claimed}** · Closed: **${counts.closed}**` +
-            (stuck > 0 ? ` · ⚠️ Awaiting archive: **${stuck}**` : ""),
+          `Open: **${counts.open}** · Claimed: **${counts.claimed}**` +
+            (counts.closed > 0 ? ` · Archived (awaiting delete): **${counts.closed}**` : ""),
           `Review channel: ${type.reviewChannelId ? `<#${type.reviewChannelId}>` : "*not set*"}`,
         ].join("\n"),
       });

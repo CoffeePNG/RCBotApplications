@@ -174,3 +174,5 @@ ensureColumn("tickets", "archive_channel_id", "TEXT");
 ensureColumn("tickets", "archive_message_id", "TEXT");
 ensureColumn("tickets", "archived_at", "INTEGER");
 ensureColumn("tickets", "archive_error", "TEXT");
+// Two-stage close: closed tickets park in an archive category before deletion.
+ensureColumn("guild_settings", "archive_category_id", "TEXT");

@@ -12,7 +12,9 @@ export interface TicketTypeConfig {
   enabled: boolean;
 }
 
-export type TicketStatus = "open" | "claimed" | "closing" | "closing_failed" | "closed";
+// open/claimed = active. closed = archived (channel moved to the archive category,
+// non-staff removed, awaiting deletion). deleted = channel removed, transcript saved.
+export type TicketStatus = "open" | "claimed" | "closed" | "deleted";
 
 export interface Ticket {
   id: number;
@@ -89,4 +91,5 @@ export interface GuildSettings {
   panelDescription: string | null;
   ticketCategoryId: string | null;
   archiveChannelId: string | null;
+  archiveCategoryId: string | null;
 }

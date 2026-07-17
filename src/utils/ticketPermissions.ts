@@ -2,6 +2,7 @@ import { Client, TextChannel } from "discord.js";
 import { getGuildSettings } from "../db/guildSettingsRepo";
 import { getTicketType } from "../db/ticketConfigRepo";
 import { getOpenTickets, getOpenTicketsByType } from "../db/ticketRepo";
+import { getActiveParticipants } from "../db/participantRepo";
 import { hasResidualTicketAccess } from "./ticketAuth";
 import { Ticket } from "../types/ticket";
 
@@ -89,4 +90,22 @@ export function resolveArchiveChannelId(guildId: string, typeKey: string): strin
   const shared = getGuildSettings(guildId).archiveChannelId;
   if (shared) return shared;
   return getTicketType(guildId, typeKey)?.reviewChannelId ?? null;
+}
+
+/**
+ * Stage-1 close: parks a ticket channel in the configured archive category (if any)
+ * and removes access for everyone but staff/managers — the creator and any added
+ * participants lose their overwrites, so only the team can still see it.
+ */
+export async function archiveTicketChannel(channel: TextChannel, ticket: Ticket): Promise<void> {
+  const categoryId = getGuildSettings(ticket.guildId).archiveCategoryId;
+  if (categoryId) {
+    await channel.setParent(categoryId, { lockPermissions: false }).catch(() => null);
+  }
+
+  // Drop the creator and every active participant; staff/manager overwrites remain.
+  await revokeChannelAccess(channel, ticket.creatorId);
+  for (const participant of getActiveParticipants(ticket.id)) {
+    await revokeChannelAccess(channel, participant.userId);
+  }
 }

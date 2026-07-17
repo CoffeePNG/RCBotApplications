@@ -1,5 +1,5 @@
 import { Client, TextChannel } from "discord.js";
-import { getTicketById, markArchiveFailed, markArchived } from "../db/ticketRepo";
+import { getTicketById, markArchived } from "../db/ticketRepo";
 import { recordAudit } from "../db/auditRepo";
 import { resolveArchiveChannelId } from "./ticketPermissions";
 import { buildTranscriptLogEmbed } from "./ticketEmbeds";
@@ -14,21 +14,13 @@ export interface ArchiveResult {
   noTarget?: boolean;
 }
 
-/** Freezes further messages in a closing ticket channel (best-effort). */
-export async function lockTicketChannel(channel: TextChannel, creatorId: string): Promise<void> {
-  await channel.permissionOverwrites
-    .edit(channel.guild.roles.everyone, { SendMessages: false })
-    .catch(() => null);
-  await channel.permissionOverwrites.edit(creatorId, { SendMessages: false }).catch(() => null);
-}
-
 /**
- * Captures a ticket's transcript and posts it (summary embed + .txt file(s)) to the
- * resolved archive channel, verifying the post landed. Marks the ticket archived on
- * success or 'closing_failed' on error. NEVER deletes the channel — the caller does
- * that only after a confirmed archive, so a failure leaves the channel intact for retry.
+ * Captures a ticket channel's transcript and posts it (summary embed + .txt
+ * file(s)) to the resolved archive channel, verifying the post landed. Used both
+ * by the Delete step and the manual `/transcript` command. Records the archive
+ * message id on success. Does NOT delete the channel — the caller decides that.
  */
-export async function archiveTicket(
+export async function postTranscript(
   client: Client,
   ticket: Ticket,
   ticketType: TicketTypeConfig,
@@ -41,23 +33,12 @@ export async function archiveTicket(
     const transcript = await generateTranscript(channel);
 
     if (!archiveChannelId) {
-      // No archive channel configured for this type — record that and let the close
-      // proceed (holding the channel open forever would be worse than no archive).
-      markArchived(ticket.id, "", "");
-      recordAudit({
-        guildId: ticket.guildId,
-        ticketId: ticket.id,
-        ticketCode: fresh.code ?? undefined,
-        eventType: "archive_succeeded",
-        newValue: "no-target",
-      });
-      return { ok: true, noTarget: true };
+      return { ok: false, noTarget: true, error: "No archive channel is configured." };
     }
 
     const archiveChannel = await client.channels.fetch(archiveChannelId).catch(() => null);
     if (!(archiveChannel instanceof TextChannel)) {
-      const error = `Archive channel is missing or not a text channel.`;
-      markArchiveFailed(ticket.id, error);
+      const error = "Archive channel is missing or not a text channel.";
       recordAudit({
         guildId: ticket.guildId,
         ticketId: ticket.id,
@@ -87,7 +68,6 @@ export async function archiveTicket(
     return { ok: true };
   } catch (error) {
     const message = (error instanceof Error ? error.message : String(error)).slice(0, 200);
-    markArchiveFailed(ticket.id, message);
     recordAudit({
       guildId: ticket.guildId,
       ticketId: ticket.id,

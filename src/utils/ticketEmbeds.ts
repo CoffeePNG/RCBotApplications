@@ -8,6 +8,7 @@ import {
 import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_PREFIX,
+  TICKET_DELETE_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
@@ -68,12 +69,22 @@ export function buildTicketEmbed(
  * The action buttons on a ticket's message, derived from its current status:
  * - open: [Claim, Close]
  * - claimed: [Unclaim, Take Over, Close]
- * - closing/closed: [Close (disabled)]
+ * - closed (archived, awaiting deletion): [Delete]
+ * - deleted: [Delete (disabled)]
  */
 export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuilder> {
   const row = new ActionRowBuilder<ButtonBuilder>();
-  const closed =
-    ticket.status === "closed" || ticket.status === "closing" || ticket.status === "closing_failed";
+
+  if (ticket.status === "closed" || ticket.status === "deleted") {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_DELETE_PREFIX}${ticket.id}`)
+        .setLabel("Delete Channel")
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(ticket.status === "deleted")
+    );
+    return row;
+  }
 
   if (ticket.status === "open") {
     row.addComponents(
@@ -100,7 +111,6 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
       .setCustomId(`${TICKET_CLOSE_PREFIX}${ticket.id}`)
       .setLabel("Close")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(closed)
   );
   return row;
 }

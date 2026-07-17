@@ -45,6 +45,7 @@ These were open questions in the spec, resolved as follows:
 | Question | Decision |
 |---|---|
 | Single- or multi-claim? | Single-claim — one holder at a time. The claimant (or a manager) can **Unclaim** to release it, or eligible staff can **Take Over**; a claimant/manager can also `/ticket assign` it to a specific staff member. Every change is recorded in `claim_history`. |
+| Close vs. delete | **Two stages.** *Close* moves the channel to the archive category and removes everyone but staff/managers (kept for review). *Delete* posts the transcript to the archive channel, verifies it, then removes the channel. `/transcript` can dump a transcript any time in between. |
 | Transcript delivery | Archive channel only — posted as a `.txt` file (split across files if large) to one shared archive channel (`/ticket-config archive-channel`) or, if none is set, that ticket type's per-type review channel. No DM to the creator. |
 | Application approval automation | Status update only — the bot does not assign a role on approval. A human handles onboarding/role assignment separately. `Manage Roles` is intentionally not requested. Closing captures a structured **outcome** (Approved/Denied/etc.) for the record. |
 | Auto-close/auto-unclaim inactive tickets | No background scheduler. Tickets stay open/claimed until explicitly closed. Claims are only auto-released when their holder leaves the server (live, plus a startup reconciliation sweep). |
@@ -88,17 +89,20 @@ staff team.") — falls back to `department` if not set.
   `Manage Server` holder. Once claimed the button set becomes **Unclaim** /
   **Take Over**.
 - **Close** button — restricted to staff, the claimant, a manager, or the
-  creator. Clicking it opens a **Close** modal collecting a structured outcome
-  (Resolved / Approved / Denied / Duplicate / Invalid / Withdrawn / No Response
-  / Other) and an optional reason. On submit the ticket is locked, its
-  transcript is archived and **verified**, and only then is the channel
-  deleted — a failed archive keeps the channel and flags it for retry.
+  creator. Opens a **Close** modal collecting a structured outcome (Resolved /
+  Approved / Denied / Duplicate / Invalid / Withdrawn / No Response / Other) and
+  an optional reason. On submit the channel is **moved to the archive category**,
+  everyone but staff/managers loses access, and the buttons become a single
+  **Delete Channel** button. The channel is kept so staff can still review it.
+- **Delete Channel** button — posts the full transcript to the archive channel,
+  **verifies** it landed, then deletes the channel. A failed archive keeps the
+  channel so nothing is lost.
+- `/transcript` — post a transcript of the current ticket channel to the archive
+  channel at any time (staff/claimant/manager/creator).
 - `/ticket unclaim` / `/ticket assign user:<user>` — release or reassign the
   current claim (claimant or a manager; assignees must be staff/manager).
 - `/ticket add user:<user>` / `/ticket remove user:<user>` — add/remove an
   extra participant on the current ticket (grants/revokes channel access).
-- `/ticket archive-retry` — re-run archiving for a ticket whose transcript
-  failed to save on close (the channel is still open).
 
 **Admin** (require `Manage Server`)
 - `/staff add|remove type:<autocomplete> user:<user>` — manage a ticket type's
@@ -113,6 +117,8 @@ staff team.") — falls back to `department` if not set.
 - `/ticket-config archive-channel channel:<channel>` — set one shared archive
   channel used for **all** types' closed-ticket transcripts (falls back to the
   per-type review channel when unset).
+- `/ticket-config archive-category category:<category>` — set the category that
+  closed ticket channels are moved to (staff-only) before deletion.
 - `/ticket-config questions type:<autocomplete>` — manage the 1–5 questions
   asked when a ticket of that type is opened (add/edit/remove/reorder/reset).
 - `/ticket-config category category:<category>` — set the category new ticket
@@ -152,18 +158,20 @@ via `/mod-config log-channel`, if configured.
 
 ## Ticket archive logs
 
-When a ticket closes, the resolved archive channel (the shared
-`/ticket-config archive-channel`, or the type's per-type review channel) gets
-one summary embed per ticket — titled `<Ticket Type> — <code>`, with
-Opened/Claimed/Closed-by, **outcome**, optional **reason**, duration, and a
-per-person message count (not the message bodies). The full transcript is
-attached as a `.txt` file (or several, split on line boundaries if it would
-exceed Discord's upload limit), never as a code block. Each message line
-carries author tag + id, message id, reply references, edit timestamps, pins,
-attachment names/urls, embed counts, and system events. The channel is only
-deleted **after** the archive post is confirmed, so a transcript is never lost
-to a failed close — a failure leaves the ticket in `closing_failed` for
-`/ticket archive-retry`.
+Closing a ticket is a two-stage process. **Close** moves the channel into the
+archive category (`/ticket-config archive-category`) and strips access from
+everyone but staff/managers, so the team can still review it. **Delete Channel**
+(or `/transcript` at any time) posts to the resolved archive channel (the shared
+`/ticket-config archive-channel`, or the type's per-type review channel): one
+summary embed — titled `<Ticket Type> — <code>`, with Opened/Claimed/Closed-by,
+**outcome**, optional **reason**, duration, and a per-person message count (not
+the message bodies) — plus the full transcript as a `.txt` file (or several,
+split on line boundaries if it would exceed Discord's upload limit), never a
+code block. Each message line carries author tag + id, message id, reply
+references, edit timestamps, pins, attachment names/urls, embed counts, and
+system events. The channel is only deleted **after** the archive post is
+confirmed, so a transcript is never lost to a failed delete — a failure keeps
+the channel so you can Delete again.
 
 ## Ticket channel names
 
@@ -204,9 +212,11 @@ the configured guild (if they don't already exist). Then, in Discord:
 1. `/ticket-config archive-channel channel:#ticket-archive` (one shared archive
    for all types), or `/ticket-config review-channel type:application
    channel:#staff-applications` per type.
-2. `/staff add type:application user:@SomeStaff` (repeat per type/staff), and
+2. `/ticket-config archive-category category:#Archived` — where closed ticket
+   channels park (staff-only) before deletion.
+3. `/staff add type:application user:@SomeStaff` (repeat per type/staff), and
    optionally `/staff manager-add user:@SomeManager` for a global manager.
-3. `/mod-config log-channel channel:#mod-log`
+4. `/mod-config log-channel channel:#mod-log`
 4. `/ticket-panel post channel:#create-a-ticket` (optional — gives members a
    dropdown instead of needing to know the slash command)
 

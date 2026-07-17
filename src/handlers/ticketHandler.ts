@@ -1,6 +1,7 @@
 import {
   ButtonInteraction,
   ChannelType,
+  ChatInputCommandInteraction,
   EmbedBuilder,
   MessageFlags,
   ModalSubmitInteraction,
@@ -14,10 +15,11 @@ import { getGuildSettings } from "../db/guildSettingsRepo";
 import { getManagers } from "../db/managerRepo";
 import {
   claimTicket,
+  closeToArchive,
   createTicket,
+  getTicketByChannel,
   getTicketById,
-  markClosed,
-  markClosing,
+  markDeleted,
   setChannelId,
   setMessageId,
 } from "../db/ticketRepo";
@@ -41,13 +43,15 @@ import { parseOutcome } from "../utils/closeOutcomes";
 import { canClaim, canClose, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
-import { archiveTicket, lockTicketChannel } from "../utils/ticketClosure";
+import { postTranscript } from "../utils/ticketClosure";
+import { archiveTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
 import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_DELETE_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -57,6 +61,7 @@ export {
   TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_DELETE_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -387,8 +392,8 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
   }
   const { ticket, ticketType } = found;
 
-  if (ticket.status === "closed" || ticket.status === "closing") {
-    await interaction.reply({ content: "This ticket is already being closed.", flags: MessageFlags.Ephemeral });
+  if (ticket.status === "closed" || ticket.status === "deleted") {
+    await interaction.reply({ content: "This ticket is already closed.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -403,7 +408,11 @@ export async function handleTicketCloseRequest(interaction: ButtonInteraction) {
   await interaction.showModal(buildCloseModal(ticketId));
 }
 
-/** Close modal submit: locks, archives (verified), then closes and deletes only on success. */
+/**
+ * Close modal submit (stage 1): records the outcome/reason, moves the channel to the
+ * archive category, removes everyone but staff/managers, and swaps in the Delete button.
+ * The channel is kept so staff can still review it; deletion is a separate step.
+ */
 export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInteraction) {
   const ticketId = Number(interaction.customId.slice(TICKET_CLOSE_MODAL_PREFIX.length));
   const found = resolveTicketAndType(ticketId);
@@ -413,8 +422,8 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
   }
   const { ticket, ticketType } = found;
 
-  if (ticket.status === "closed" || ticket.status === "closing") {
-    await interaction.reply({ content: "This ticket is already being closed.", flags: MessageFlags.Ephemeral });
+  if (ticket.status === "closed" || ticket.status === "deleted") {
+    await interaction.reply({ content: "This ticket is already closed.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -429,88 +438,110 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const closing = markClosing(ticketId, interaction.user.id, reason, outcome);
-  if (!closing) {
-    await interaction.editReply({ content: "Couldn't start closing this ticket." });
+  const closed = closeToArchive(ticketId, interaction.user.id, reason, outcome);
+  if (!closed) {
+    await interaction.editReply({ content: "Couldn't close this ticket." });
     return;
   }
   recordAudit({
-    guildId: closing.guildId,
-    ticketId: closing.id,
-    ticketCode: closing.code ?? undefined,
+    guildId: closed.guildId,
+    ticketId: closed.id,
+    ticketCode: closed.code ?? undefined,
     actorId: interaction.user.id,
-    eventType: "close_initiated",
+    eventType: "ticket_closed",
     newValue: outcome ?? undefined,
   });
 
-  // Freeze the channel so no messages arrive between transcript capture and deletion.
-  await lockTicketChannel(channel, closing.creatorId);
+  // Park in the archive category and strip access from everyone but staff/managers.
+  await archiveTicketChannel(channel, closed);
+  await updateTicketMessage(interaction.client, closed, ticketType);
+
   await channel
-    .send(`This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}.`)
+    .send(
+      `This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}. ` +
+        "It's been archived for staff. Use `/transcript` for a log, or **Delete Channel** to remove it."
+    )
     .catch(() => null);
 
-  const result = await finalizeClose(interaction.client, closing, ticketType, channel);
-  await interaction.editReply({ content: result.message });
-}
-
-interface CloseResult {
-  message: string;
+  await interaction.editReply({
+    content: "Ticket closed and archived. It's now staff-only — use **Delete Channel** when you're done with it.",
+  });
 }
 
 /**
- * Archives the ticket (verified) and, only on success, marks it closed and deletes
- * the channel after a short grace period. On failure the channel is left intact and
- * the ticket sits in 'closing_failed' for `/ticket archive-retry`.
+ * Delete button (stage 2): posts the transcript to the archive channel, verifies it
+ * landed, then removes the channel. If archiving fails the channel is kept so nothing
+ * is lost.
  */
-async function finalizeClose(
-  client: TextChannel["client"],
-  ticket: Ticket,
-  ticketType: TicketTypeConfig,
-  channel: TextChannel
-): Promise<CloseResult> {
-  const archive = await archiveTicket(client, ticket, ticketType, channel);
+export async function handleTicketDelete(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_DELETE_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
 
-  if (!archive.ok) {
-    await updateTicketMessage(client, getTicketById(ticket.id) ?? ticket, ticketType);
-    await channel
-      .send(
-        "⚠️ I couldn't archive this ticket's transcript, so the channel is being kept open. " +
-          "A staff member can retry with `/ticket archive-retry`."
-      )
-      .catch(() => null);
-    return {
-      message: `Archiving failed (${archive.error ?? "unknown error"}). The channel was kept — run \`/ticket archive-retry\` here to try again.`,
-    };
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({ content: "You don't have permission to delete this ticket.", flags: MessageFlags.Ephemeral });
+    return;
   }
 
-  const closed = markClosed(ticket.id);
-  recordAudit({
-    guildId: ticket.guildId,
-    ticketId: ticket.id,
-    ticketCode: ticket.code ?? undefined,
-    actorId: ticket.closedBy ?? undefined,
-    eventType: "ticket_closed",
-  });
-  await updateTicketMessage(client, closed ?? ticket, ticketType);
+  const channel = interaction.channel;
+  if (!(channel instanceof TextChannel)) {
+    await interaction.reply({ content: "This ticket's channel is unavailable.", flags: MessageFlags.Ephemeral });
+    return;
+  }
 
-  await channel.send("Transcript archived. This channel will be deleted in 5 seconds.").catch(() => null);
+  await interaction.reply({ content: "Saving transcript and deleting…", flags: MessageFlags.Ephemeral });
+
+  const archive = await postTranscript(interaction.client, ticket, ticketType, channel);
+  if (!archive.ok) {
+    await interaction.editReply({
+      content: archive.noTarget
+        ? "No archive channel is configured, so there's nowhere to save the transcript. Set one with `/ticket-config archive-channel` first, then Delete again."
+        : `Couldn't save the transcript (${archive.error ?? "unknown error"}), so the channel was kept. Try Delete again once it's resolved.`,
+    });
+    return;
+  }
+
+  markDeleted(ticket.id);
+  await channel.send("Transcript saved. Deleting this channel in 5 seconds.").catch(() => null);
   setTimeout(() => channel.delete().catch(() => null), 5000);
-
-  return {
-    message: archive.noTarget
-      ? "Ticket closed. (No archive channel is configured, so no transcript was saved.)"
-      : "Ticket closed and transcript archived. The channel will be deleted shortly.",
-  };
 }
 
-/** Re-attempts archiving for a ticket stuck in closing / closing_failed, then deletes on success. */
-export async function retryTicketArchive(
-  client: TextChannel["client"],
-  ticket: Ticket,
-  ticketType: TicketTypeConfig,
-  channel: TextChannel
-): Promise<CloseResult> {
-  return finalizeClose(client, ticket, ticketType, channel);
+/** `/transcript`: post the current channel's transcript to the archive channel, anytime. */
+export async function handleTranscriptCommand(interaction: ChatInputCommandInteraction) {
+  const guildId = interaction.guildId;
+  const channel = interaction.channel;
+  const ticket = channel ? getTicketByChannel(channel.id) : null;
+  if (!guildId || !ticket) {
+    await interaction.reply({ content: "Run this inside a ticket channel.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const ticketType = getTicketType(guildId, ticket.typeKey);
+  if (!ticketType) {
+    await interaction.reply({ content: "This ticket's type no longer exists.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!canClose({ userId: interaction.user.id, permissions: interaction.memberPermissions, ticket, ticketType })) {
+    await interaction.reply({ content: "You don't have permission to do that here.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!(channel instanceof TextChannel)) {
+    await interaction.reply({ content: "This channel is unavailable.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const archive = await postTranscript(interaction.client, ticket, ticketType, channel);
+  await interaction.editReply({
+    content: archive.ok
+      ? "Transcript posted to the archive channel."
+      : archive.noTarget
+        ? "No archive channel is configured. Set one with `/ticket-config archive-channel` first."
+        : `Couldn't post the transcript: ${archive.error ?? "unknown error"}.`,
+  });
 }
 
 function safeField(interaction: ModalSubmitInteraction, fieldId: string): string {

@@ -110,20 +110,24 @@ export function setClaim(id: number, userId: string | null): Ticket | null {
   return getTicketById(id);
 }
 
-/** Marks a ticket 'closing' with its reason/outcome (channel not yet deleted). */
-export function markClosing(
+/**
+ * Close (stage 1): marks a ticket 'closed' with its reason/outcome. The channel
+ * is kept (moved to the archive category, non-staff removed) until it's deleted.
+ */
+export function closeToArchive(
   id: number,
   userId: string,
   reason: string | null,
   outcome: string | null
 ): Ticket | null {
   db.prepare(
-    `UPDATE tickets SET status = 'closing', closed_by = ?, closed_at = ?, close_reason = ?, outcome = ?
+    `UPDATE tickets SET status = 'closed', closed_by = ?, closed_at = ?, close_reason = ?, outcome = ?
      WHERE id = ?`
   ).run(userId, Date.now(), reason, outcome, id);
   return getTicketById(id);
 }
 
+/** Records that a transcript was posted to the archive channel. */
 export function markArchived(id: number, channelId: string, messageId: string): Ticket | null {
   db.prepare(
     `UPDATE tickets SET archive_channel_id = ?, archive_message_id = ?, archived_at = ?, archive_error = NULL
@@ -132,15 +136,9 @@ export function markArchived(id: number, channelId: string, messageId: string): 
   return getTicketById(id);
 }
 
-export function markArchiveFailed(id: number, error: string): Ticket | null {
-  db.prepare(
-    `UPDATE tickets SET status = 'closing_failed', archive_error = ? WHERE id = ?`
-  ).run(error, id);
-  return getTicketById(id);
-}
-
-export function markClosed(id: number): Ticket | null {
-  db.prepare(`UPDATE tickets SET status = 'closed' WHERE id = ?`).run(id);
+/** Delete (stage 2): marks a ticket 'deleted' once its channel has been removed. */
+export function markDeleted(id: number): Ticket | null {
+  db.prepare(`UPDATE tickets SET status = 'deleted' WHERE id = ?`).run(id);
   return getTicketById(id);
 }
 
@@ -169,13 +167,6 @@ export function getActiveTicketsClaimedBy(guildId: string, userId: string): Tick
   return rows.map(rowToTicket);
 }
 
-export function getRecoverableTickets(): Ticket[] {
-  const rows = db
-    .prepare(`SELECT * FROM tickets WHERE status IN ('closing','closing_failed')`)
-    .all() as any[];
-  return rows.map(rowToTicket);
-}
-
 export function getCounts(guildId: string, typeKey: string): Record<TicketStatus, number> {
   const rows = db
     .prepare(
@@ -185,9 +176,8 @@ export function getCounts(guildId: string, typeKey: string): Record<TicketStatus
   const counts: Record<TicketStatus, number> = {
     open: 0,
     claimed: 0,
-    closing: 0,
-    closing_failed: 0,
     closed: 0,
+    deleted: 0,
   };
   for (const row of rows) {
     counts[row.status as TicketStatus] = row.count;

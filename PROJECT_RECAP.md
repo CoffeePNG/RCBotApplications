@@ -43,10 +43,13 @@ storing everything in a local SQLite file.
 3. **Close** — staff, the claimant, a manager, or the creator clicks **Close**
    → a **modal** collects a structured outcome (Resolved / Approved / Denied /
    Duplicate / Invalid / Withdrawn / No Response / Other) + optional reason. On
-   submit the channel is locked, a "closed by X" notice is posted, the
-   transcript is archived **and verified**, and only then is the channel
-   deleted. If archiving fails the channel is kept and the ticket sits in
-   `closing_failed` for `/ticket archive-retry` — a transcript is never lost.
+   submit the channel is **moved to the archive category** and everyone but
+   staff/managers loses access — it's kept for staff review. The buttons become
+   a single **Delete Channel**.
+4. **Delete** — **Delete Channel** (or `/transcript` any time) posts the full
+   transcript to the archive channel and **verifies** it landed; only then is
+   the channel removed. If archiving fails the channel is kept so nothing is
+   lost — just Delete again once the archive channel is fixed.
 
 ### Ticket codes
 
@@ -56,7 +59,7 @@ a random 5-digit number, uniqueness-checked. It's used as the **channel name**
 and shown in the embed footer, archive summary, review notice, and transcript
 filename. Numeric IDs still run the internals (buttons/lookups).
 
-### Ticket archive (on close)
+### Ticket archive (on delete / `/transcript`)
 
 Posted to the resolved archive channel — one shared channel
 (`/ticket-config archive-channel`) if set, else the type's per-type review
@@ -68,8 +71,10 @@ channel:
    tag+id, message id, reply refs, edit timestamps, pins, attachments, embed
    counts, and system events.
 
-Transcripts capture what users actually typed (requires the **Message Content**
-privileged intent, enabled in code and in the Developer Portal).
+Closed channels are first parked in the **archive category**
+(`/ticket-config archive-category`), staff-only, until deleted. Transcripts
+capture what users actually typed (requires the **Message Content** privileged
+intent, enabled in code and in the Developer Portal).
 
 ---
 
@@ -98,11 +103,11 @@ onto each ticket, so editing a type's questions never rewrites old tickets.
 - `/ticket create type:<autocomplete>` — anyone; opens the questions modal.
 - **Ticket panel** — a persistent embed + dropdown (Ticket Tool style) that
   members click instead of typing the command. Only shows **open** types.
-- **Claim / Unclaim / Take Over / Close buttons** on the ticket message (Close
-  opens the structured outcome+reason modal).
+- **Claim / Unclaim / Take Over / Close / Delete buttons** on the ticket message
+  (Close opens the outcome+reason modal → archives channel + shows Delete).
+- `/transcript` — post a transcript of the current channel to the archive channel.
 - `/ticket unclaim` · `/ticket assign user:<>` — release/reassign the claim.
 - `/ticket add user:<>` · `/ticket remove user:<>` — manage extra participants.
-- `/ticket archive-retry` — retry a close whose transcript failed to archive.
 
 ### Admin (require Manage Server)
 - `/staff add|remove type:<> user:<>` — manage a type's staff live (syncs
@@ -114,7 +119,9 @@ onto each ticket, so editing a type's questions never rewrites old tickets.
 - `/ticket-config review-channel type:<> channel:<>` — set a type's per-type
   review/archive channel.
 - `/ticket-config archive-channel channel:<>` — one shared archive channel for
-  all types (falls back to per-type review channel when unset).
+  all types' transcripts (falls back to per-type review channel when unset).
+- `/ticket-config archive-category category:<>` — category that closed ticket
+  channels are moved to (staff-only) before deletion.
 - `/ticket-config questions type:<>` — add/edit/remove/reorder/reset a type's
   1–5 create questions (panel of buttons + modals).
 - `/ticket-config open-message | claim-message | option-description type:<>` —
@@ -148,6 +155,7 @@ Successful mod actions are logged as an embed to the mod-log channel if set.
 | Question | Decision |
 |---|---|
 | Single- or multi-claim? | Single-claim, with unclaim / take over / assign. |
+| Close vs. delete | Two stages: Close archives the channel (staff-only) → Delete posts the transcript + removes it. `/transcript` works any time. |
 | Transcript delivery | Archive channel only (summary embed + `.txt` file(s), no code block). |
 | Application approval automation | Status update only — no auto role assignment; close records a structured outcome. |
 | Auto-close inactive tickets | Not implemented — manual close only. Claims auto-release only when the holder leaves the server. |
@@ -181,13 +189,14 @@ Successful mod actions are logged as an embed to the mod-log channel if set.
 
 1. `/ticket-config archive-channel channel:<#ticket-archive>` (or per-type
    `/ticket-config review-channel type:<each> channel:<#...>`)
-2. `/staff add type:<each> user:<@staff>` (per staff); optionally
+2. `/ticket-config archive-category category:<Archived>` (where closed channels park)
+3. `/staff add type:<each> user:<@staff>` (per staff); optionally
    `/staff manager-add user:<@manager>` for a global manager
-3. `/ticket-config questions type:<each>` — review/adjust the seeded questions
-4. `/ticket-config category category:<pick a category>`
-5. `/mod-config log-channel channel:<#mod-log>`
-6. `/ticket-config enabled type:<> open:false` for any types not ready yet
-7. `/ticket-panel post channel:<#create-a-ticket>`
+4. `/ticket-config questions type:<each>` — review/adjust the seeded questions
+5. `/ticket-config category category:<pick a category>`
+6. `/mod-config log-channel channel:<#mod-log>`
+7. `/ticket-config enabled type:<> open:false` for any types not ready yet
+8. `/ticket-panel post channel:<#create-a-ticket>`
 
 Members can then use `/ticket create` or the panel.
 
