@@ -21,6 +21,7 @@ import {
   getTicketByChannel,
   getTicketById,
   markDeleted,
+  reopenTicket,
   setChannelId,
   setMessageId,
 } from "../db/ticketRepo";
@@ -30,6 +31,7 @@ import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
+  buildDeleteConfirmRow,
   buildOutcomeButtons,
   buildTicketButtons,
   buildTicketEmbed,
@@ -45,7 +47,7 @@ import { TICKET_CAP_MESSAGE, canClaim, canClose, canOpenNewTicket, canUnclaim } 
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
-import { archiveTicketChannel } from "../utils/ticketPermissions";
+import { archiveTicketChannel, restoreTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
 import { buildPanelContent } from "../utils/ticketPanel";
 import {
@@ -53,8 +55,10 @@ import {
   TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
+  TICKET_REOPEN_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -64,8 +68,11 @@ export {
   TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_DELETE_CANCEL_PREFIX,
+  TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
+  TICKET_REOPEN_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "./ticketConstants";
@@ -552,13 +559,41 @@ export async function handleTicketDelete(interaction: ButtonInteraction) {
     return;
   }
 
-  const channel = interaction.channel;
-  if (!(channel instanceof TextChannel)) {
-    await interaction.reply({ content: "This ticket's channel is unavailable.", flags: MessageFlags.Ephemeral });
+  // Step 1 of the two-step delete: ask for confirmation before doing anything.
+  await interaction.reply({
+    content: "Delete this channel for good? The transcript is saved to the archive channel first — this can't be undone.",
+    components: [buildDeleteConfirmRow(ticketId)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+/** Delete confirmation "Cancel": dismisses the prompt, channel stays. */
+export async function handleTicketDeleteCancel(interaction: ButtonInteraction) {
+  await interaction.update({ content: "Delete cancelled — the channel is still here.", components: [] });
+}
+
+/** Delete confirmation "Yes": saves the transcript (verified), then removes the channel. */
+export async function handleTicketDeleteConfirm(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_DELETE_CONFIRM_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.update({ content: "Ticket not found.", components: [] });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
+    await interaction.update({ content: "You don't have permission to delete this ticket.", components: [] });
     return;
   }
 
-  await interaction.reply({ content: "Saving transcript and deleting…", flags: MessageFlags.Ephemeral });
+  const channel = interaction.channel;
+  if (!(channel instanceof TextChannel)) {
+    await interaction.update({ content: "This ticket's channel is unavailable.", components: [] });
+    return;
+  }
+
+  await interaction.update({ content: "Saving transcript and deleting…", components: [] });
 
   const archive = await postTranscript(interaction.client, ticket, ticketType, channel);
   if (!archive.ok) {
@@ -573,6 +608,47 @@ export async function handleTicketDelete(interaction: ButtonInteraction) {
   markDeleted(ticket.id);
   await channel.send("Transcript saved. Deleting this channel in 5 seconds.").catch(() => null);
   setTimeout(() => channel.delete().catch(() => null), 5000);
+}
+
+/** Reopen a closed ticket: back to active, channel restored to the ticket category, access returned. */
+export async function handleTicketReopen(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_REOPEN_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "Ticket not found.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (ticket.status !== "closed") {
+    await interaction.reply({ content: "This ticket can't be reopened.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (!canClose(authCtx(interaction, ticket, ticketType))) {
+    await interaction.reply({ content: "You don't have permission to reopen this ticket.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const reopened = reopenTicket(ticketId);
+  if (!reopened) {
+    await interaction.reply({ content: "Couldn't reopen this ticket.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  recordAudit({
+    guildId: reopened.guildId,
+    ticketId: reopened.id,
+    ticketCode: reopened.code ?? undefined,
+    actorId: interaction.user.id,
+    eventType: "ticket_reopened",
+  });
+
+  await interaction.deferUpdate();
+  const channel = interaction.channel;
+  if (channel instanceof TextChannel) {
+    await restoreTicketChannel(channel, reopened);
+    await channel.send(`This ticket was reopened by <@${interaction.user.id}>.`).catch(() => null);
+  }
+  await updateTicketMessage(interaction.client, reopened, ticketType);
 }
 
 /** `/transcript`: post the current channel's transcript to the archive channel, anytime. */

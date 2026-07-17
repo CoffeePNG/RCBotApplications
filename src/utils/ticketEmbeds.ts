@@ -8,8 +8,11 @@ import {
 import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_PREFIX,
+  TICKET_DELETE_CANCEL_PREFIX,
+  TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
+  TICKET_REOPEN_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
@@ -78,12 +81,18 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
   const row = new ActionRowBuilder<ButtonBuilder>();
 
   if (ticket.status === "closed" || ticket.status === "deleted") {
+    const done = ticket.status === "deleted";
     row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_REOPEN_PREFIX}${ticket.id}`)
+        .setLabel("Reopen")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(done),
       new ButtonBuilder()
         .setCustomId(`${TICKET_DELETE_PREFIX}${ticket.id}`)
         .setLabel("Delete Channel")
         .setStyle(ButtonStyle.Danger)
-        .setDisabled(ticket.status === "deleted")
+        .setDisabled(done)
     );
     return row;
   }
@@ -115,6 +124,20 @@ export function buildTicketButtons(ticket: Ticket): ActionRowBuilder<ButtonBuild
       .setStyle(ButtonStyle.Danger)
   );
   return row;
+}
+
+/** Confirm/Cancel buttons for the two-step channel delete (shown ephemerally). */
+export function buildDeleteConfirmRow(ticketId: number): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${TICKET_DELETE_CONFIRM_PREFIX}${ticketId}`)
+      .setLabel("Yes, delete it")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`${TICKET_DELETE_CANCEL_PREFIX}${ticketId}`)
+      .setLabel("Cancel")
+      .setStyle(ButtonStyle.Secondary)
+  );
 }
 
 /** The outcome-picker buttons shown (ephemerally) after clicking Close. */

@@ -13,7 +13,8 @@ export type AuditEventType =
   | "close_initiated"
   | "archive_succeeded"
   | "archive_failed"
-  | "ticket_closed";
+  | "ticket_closed"
+  | "ticket_reopened";
 
 export interface AuditEntry {
   guildId: string;

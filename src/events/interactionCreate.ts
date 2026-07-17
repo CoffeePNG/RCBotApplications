@@ -11,9 +11,12 @@ import {
   TICKET_CLOSE_MODAL_PREFIX,
   TICKET_CLOSE_PREFIX,
   TICKET_CREATE_MODAL_PREFIX,
+  TICKET_DELETE_CANCEL_PREFIX,
+  TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_PANEL_SELECT_ID,
+  TICKET_REOPEN_PREFIX,
   TICKET_TAKEOVER_PREFIX,
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
@@ -23,8 +26,11 @@ import {
   handleTicketCloseRequest,
   handleTicketCreateModal,
   handleTicketDelete,
+  handleTicketDeleteCancel,
+  handleTicketDeleteConfirm,
   handleTicketOutcomeSelect,
   handleTicketPanelSelect,
+  handleTicketReopen,
   handleTicketTakeover,
   handleTicketUnclaim,
 } from "../handlers/ticketHandler";
@@ -110,6 +116,12 @@ export async function handleInteraction(
         await handleTicketUnclaim(interaction);
       } else if (interaction.customId.startsWith(TICKET_TAKEOVER_PREFIX)) {
         await handleTicketTakeover(interaction);
+      } else if (interaction.customId.startsWith(TICKET_REOPEN_PREFIX)) {
+        await handleTicketReopen(interaction);
+      } else if (interaction.customId.startsWith(TICKET_DELETE_CONFIRM_PREFIX)) {
+        await handleTicketDeleteConfirm(interaction);
+      } else if (interaction.customId.startsWith(TICKET_DELETE_CANCEL_PREFIX)) {
+        await handleTicketDeleteCancel(interaction);
       } else if (interaction.customId.startsWith(TICKET_DELETE_PREFIX)) {
         await handleTicketDelete(interaction);
       } else if (QUESTION_BUTTON_PREFIXES.some((p) => interaction.customId.startsWith(p))) {

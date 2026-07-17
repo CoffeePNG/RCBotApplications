@@ -48,10 +48,12 @@ storing everything in a local SQLite file.
    optional-reason note. The channel is then **moved to the archive category**
    and everyone but staff/managers loses access — it's kept for staff review.
    The buttons become a single **Delete Channel**.
-4. **Delete** — **Delete Channel** (or `/transcript` any time) posts the full
-   transcript to the archive channel and **verifies** it landed; only then is
-   the channel removed. If archiving fails the channel is kept so nothing is
-   lost — just Delete again once the archive channel is fixed.
+4. **Reopen or Delete** — a closed ticket shows **Reopen** and **Delete Channel**
+   (staff only). *Reopen* reverts it to active, moves the channel back to the
+   ticket category, and restores creator/participant access. *Delete* is
+   **two-step**: confirm → post the transcript to the archive channel and
+   **verify** it landed → then remove the channel (a failed archive keeps the
+   channel). `/transcript` can dump a transcript any time in between.
 
 ### Ticket codes
 

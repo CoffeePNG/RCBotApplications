@@ -96,9 +96,13 @@ staff team.") — falls back to `department` if not set.
   the archive category**, everyone but staff/managers loses access, and the
   buttons become a single **Delete Channel** button. The channel is kept so
   staff can still review it.
-- **Delete Channel** button — posts the full transcript to the archive channel,
-  **verifies** it landed, then deletes the channel. A failed archive keeps the
-  channel so nothing is lost.
+- **Reopen** button (on a closed ticket) — reverts it to active, moves the
+  channel back to the normal ticket category, and restores the creator's /
+  participants' access. Staff only.
+- **Delete Channel** button — a **two-step** delete: it asks for confirmation
+  first, then posts the full transcript to the archive channel, **verifies** it
+  landed, and only then deletes the channel. A failed archive keeps the channel
+  so nothing is lost. Staff only.
 - `/transcript` — post a transcript of the current ticket channel to the archive
   channel at any time (staff/claimant/manager/creator).
 - `/ticket unclaim` / `/ticket assign user:<user>` — release or reassign the

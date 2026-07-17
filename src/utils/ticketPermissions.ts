@@ -113,3 +113,19 @@ export async function archiveTicketChannel(channel: TextChannel, ticket: Ticket)
     await revokeChannelAccess(channel, participant.userId);
   }
 }
+
+/**
+ * Reopen: moves a channel back to the normal ticket category and restores access
+ * for the creator and any active participants (staff/managers never lost access).
+ */
+export async function restoreTicketChannel(channel: TextChannel, ticket: Ticket): Promise<void> {
+  const categoryId = getGuildSettings(ticket.guildId).ticketCategoryId;
+  if (categoryId) {
+    await channel.setParent(categoryId, { lockPermissions: false }).catch(() => null);
+  }
+
+  await grantChannelAccess(channel, ticket.creatorId);
+  for (const participant of getActiveParticipants(ticket.id)) {
+    await grantChannelAccess(channel, participant.userId);
+  }
+}

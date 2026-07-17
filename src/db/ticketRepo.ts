@@ -142,6 +142,18 @@ export function markDeleted(id: number): Ticket | null {
   return getTicketById(id);
 }
 
+/** Reopens a closed ticket: back to claimed (if it still has a claimant) or open, clearing close info. */
+export function reopenTicket(id: number): Ticket | null {
+  const ticket = getTicketById(id);
+  if (!ticket) return null;
+  const status: TicketStatus = ticket.claimedBy ? "claimed" : "open";
+  db.prepare(
+    `UPDATE tickets SET status = ?, close_reason = NULL, outcome = NULL, closed_at = NULL, closed_by = NULL
+     WHERE id = ?`
+  ).run(status, id);
+  return getTicketById(id);
+}
+
 export function getOpenTicketsByType(guildId: string, typeKey: string): Ticket[] {
   const rows = db
     .prepare(
