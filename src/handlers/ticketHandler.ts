@@ -6,6 +6,7 @@ import {
   MessageFlags,
   ModalSubmitInteraction,
   OverwriteResolvable,
+  OverwriteType,
   PermissionFlagsBits,
   StringSelectMenuInteraction,
   TextChannel,
@@ -46,6 +47,7 @@ import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
 import { archiveTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
+import { buildPanelContent } from "../utils/ticketPanel";
 import {
   TICKET_CLAIM_PREFIX,
   TICKET_CLOSE_MODAL_PREFIX,
@@ -141,19 +143,22 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
   saveAnswers(ticket.id, answerEntries);
   const channelName = ticket.code ?? `ticket-${ticket.id}`;
 
+  // Each overwrite states its `type` explicitly. Without it, discord.js tries to
+  // resolve the id against its user/role cache to guess the type and throws
+  // "not a cached User or Role" for any staff/manager who isn't currently cached.
+  const viewerAllow = [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.AttachFiles,
+    PermissionFlagsBits.EmbedLinks,
+  ];
   const overwrites: OverwriteResolvable[] = [
-    { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-    {
-      id: interaction.user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles,
-      ],
-    },
+    { id: guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: interaction.user.id, type: OverwriteType.Member, allow: viewerAllow },
     {
       id: interaction.client.user.id,
+      type: OverwriteType.Member,
       allow: [
         PermissionFlagsBits.ViewChannel,
         PermissionFlagsBits.SendMessages,
@@ -163,13 +168,8 @@ export async function handleTicketCreateModal(interaction: ModalSubmitInteractio
     },
     ...[...new Set([...leads, ...getManagers(guildId)])].map((viewerId) => ({
       id: viewerId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles,
-        PermissionFlagsBits.EmbedLinks,
-      ],
+      type: OverwriteType.Member,
+      allow: viewerAllow,
     })),
   ];
 
@@ -278,9 +278,16 @@ export async function handleTicketPanelSelect(interaction: StringSelectMenuInter
       content: "This ticket type is no longer configured.",
       flags: MessageFlags.Ephemeral,
     });
-    return;
+  } else {
+    await showTicketCreateModal(interaction, guildId, ticketType);
   }
-  await showTicketCreateModal(interaction, guildId, ticketType);
+
+  // Re-render the panel's dropdown so the user's pick doesn't stay selected —
+  // otherwise they can't choose the same option twice in a row.
+  const content = buildPanelContent(guildId);
+  if (content) {
+    await interaction.message.edit({ components: [content.row] }).catch(() => null);
+  }
 }
 
 /** Claim button: locks the ticket to one lead (or Manage Server holder) and pings the creator. */

@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Client, OverwriteType, TextChannel } from "discord.js";
 import { getGuildSettings } from "../db/guildSettingsRepo";
 import { getTicketType } from "../db/ticketConfigRepo";
 import { getOpenTickets, getOpenTicketsByType } from "../db/ticketRepo";
@@ -22,7 +22,11 @@ async function fetchTicketChannel(client: Client, ticket: Ticket): Promise<TextC
 }
 
 export async function grantChannelAccess(channel: TextChannel, userId: string): Promise<void> {
-  await channel.permissionOverwrites.edit(userId, VIEWER_ALLOW).catch(() => null);
+  // `type: Member` avoids the "not a cached User or Role" resolution error for
+  // users who aren't in the bot's cache.
+  await channel.permissionOverwrites
+    .edit(userId, VIEWER_ALLOW, { type: OverwriteType.Member })
+    .catch(() => null);
 }
 
 export async function revokeChannelAccess(channel: TextChannel, userId: string): Promise<void> {
