@@ -162,7 +162,10 @@ staff team.") — falls back to `department` if not set.
 - `/warnings user` — lists a user's active warnings.
 
 All moderation actions that succeed are logged as an embed to the channel set
-via `/mod-config log-channel`, if configured.
+via `/mod-config log-channel`, if configured. The same channel also logs ticket
+lifecycle events — **close** (with its outcome and note), **reopen**, and
+**channel delete** — so the closing feedback is kept even after the ticket
+channel is deleted.
 
 ## Ticket archive logs
 

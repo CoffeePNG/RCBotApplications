@@ -49,6 +49,7 @@ import { applyClaimChange } from "../utils/claimActions";
 import { postTranscript } from "../utils/ticketClosure";
 import { makeChannelStaffOnly, moveToArchiveCategory, restoreTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
+import { postTicketLog } from "../utils/logger";
 import { buildPanelContent } from "../utils/ticketPanel";
 import {
   TICKET_CLAIM_PREFIX,
@@ -524,6 +525,10 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
     eventType: "ticket_closed",
     newValue: outcome ?? undefined,
   });
+  await postTicketLog(interaction.client, closed, ticketType, "closed", interaction.user.id, {
+    outcome,
+    reason,
+  });
 
   // Park in the archive category, but leave everyone's access intact — staff can
   // lock it down later with "Make Staff Only".
@@ -637,6 +642,17 @@ export async function handleTicketDeleteConfirm(interaction: ButtonInteraction) 
   }
 
   markDeleted(ticket.id);
+  recordAudit({
+    guildId: ticket.guildId,
+    ticketId: ticket.id,
+    ticketCode: ticket.code ?? undefined,
+    actorId: interaction.user.id,
+    eventType: "ticket_deleted",
+  });
+  await postTicketLog(interaction.client, ticket, ticketType, "deleted", interaction.user.id, {
+    outcome: ticket.outcome,
+    reason: ticket.closeReason,
+  });
   await channel.send("Transcript saved. Deleting this channel in 5 seconds.").catch(() => null);
   setTimeout(() => channel.delete().catch(() => null), 5000);
 }
@@ -672,6 +688,7 @@ export async function handleTicketReopen(interaction: ButtonInteraction) {
     actorId: interaction.user.id,
     eventType: "ticket_reopened",
   });
+  await postTicketLog(interaction.client, reopened, ticketType, "reopened", interaction.user.id);
 
   await interaction.deferUpdate();
   const channel = interaction.channel;

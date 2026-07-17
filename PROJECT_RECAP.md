@@ -152,6 +152,9 @@ onto each ticket, so editing a type's questions never rewrites old tickets.
 - `/warnings user` — lists a user's active warnings.
 
 Successful mod actions are logged as an embed to the mod-log channel if set.
+Ticket lifecycle events — **close** (with outcome + note), **reopen**, and
+**channel delete** — are logged to the same mod-log channel, so the closing
+feedback survives even after the ticket channel itself is deleted.
 
 ---
 
