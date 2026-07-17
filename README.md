@@ -1,9 +1,8 @@
 # RCBotApplications — Republicraft Discord Utility Bot
 
 A single config-driven ticket system (applications, bug reports, appeals, help
-requests) plus a standard moderation command suite. Built per the Republicraft
-build spec: one ticket pipeline, no visible Discord roles for permission
-gating, no web dashboard.
+requests). Built per the Republicraft build spec: one ticket pipeline, no
+visible Discord roles for permission gating, no web dashboard.
 
 ## Design summary
 
@@ -26,11 +25,10 @@ gating, no web dashboard.
   `Administrator` remain a live override on top of both. All access decisions
   go through one helper, `src/utils/ticketAuth.ts`.
 - **Scoped bot permissions.** The bot needs `Manage Channels` (create/delete
-  ticket channels), `Kick Members`, `Ban Members`, `Moderate Members` (for
-  the moderation suite), and `Send Messages`/`Read Message History`/
-  `Attach Files` generally. It does **not** need Administrator, and does not
-  request `Manage Roles` — application approval is a status update only, it
-  does not auto-assign a role (see "Decisions" below).
+  ticket channels) and `Send Messages`/`Read Message History`/`Attach Files`
+  generally. It does **not** need Administrator, and does not request
+  `Manage Roles` — application approval is a status update only, it does not
+  auto-assign a role (see "Decisions" below).
 - **Built for handoff.** Routine staff management — who's staff for which
   ticket type, who's a Ticket Manager, and an at-a-glance status view — is
   done entirely through slash commands (`/staff`, `/staff-status`). No terminal
@@ -150,22 +148,16 @@ staff team.") — falls back to `department` if not set.
   current title/description (use `{types}` in the description to insert the
   type list). Leaving a field blank resets it to the default. If a panel is
   already posted, it's refreshed live immediately.
-- `/mod-config log-channel channel:<channel>` — set the moderation log
-  channel.
+- `/ticket-config log-channel channel:<channel>` — set the channel that ticket
+  lifecycle events are logged to.
 
-**Moderation**
-- `/ban user reason? delete_message_days?` — requires `Ban Members`.
-- `/kick user reason?` — requires `Kick Members`.
-- `/timeout user minutes reason?` — requires `Moderate Members`.
-- `/warn user reason` — requires `Moderate Members`; persisted in SQLite.
-- `/unwarn warning_id` — clears (soft-deletes) a warning.
-- `/warnings user` — lists a user's active warnings.
+**Ticket logging**
 
-All moderation actions that succeed are logged as an embed to the channel set
-via `/mod-config log-channel`, if configured. The same channel also logs ticket
-lifecycle events — **close** (with its outcome and note), **reopen**, and
-**channel delete** — so the closing feedback is kept even after the ticket
-channel is deleted.
+Ticket lifecycle events — **close** (with its outcome and note), **reopen**, and
+**channel delete** — are logged as an embed to the channel set via
+`/ticket-config log-channel`, if configured. Because the log lives in its own
+channel, the closing feedback survives even after the ticket channel itself is
+deleted.
 
 ## Ticket archive logs
 
@@ -228,8 +220,9 @@ the configured guild (if they don't already exist). Then, in Discord:
    channels park (staff-only) before deletion.
 3. `/staff add type:application user:@SomeStaff` (repeat per type/staff), and
    optionally `/staff manager-add user:@SomeManager` for a global manager.
-4. `/mod-config log-channel channel:#mod-log`
-4. `/ticket-panel post channel:#create-a-ticket` (optional — gives members a
+4. `/ticket-config log-channel channel:#ticket-log` (optional — records
+   close/reopen/delete events).
+5. `/ticket-panel post channel:#create-a-ticket` (optional — gives members a
    dropdown instead of needing to know the slash command)
 
 Members can then run `/ticket create` or use the panel.
@@ -241,15 +234,14 @@ Gateway intents: `Guilds`, `GuildMessages`, plus two **privileged** intents —
 release a staff member's claims when they leave the server). Both privileged
 intents must also be enabled in the Discord Developer Portal (Bot → Privileged
 Gateway Intents) or the bot fails to log in. Server permissions:
-`Manage Channels`, `Kick Members`, `Ban Members`, `Moderate Members`, plus the
-ability to send messages/embeds/files and read message history in whatever
-channels get used as review/archive/mod-log channels. No Administrator, no
-Manage Roles.
+`Manage Channels`, plus the ability to send messages/embeds/files and read
+message history in whatever channels get used as review/archive/ticket-log
+channels. No Administrator, no Manage Roles.
 
 ## Deploying to a VPS (24/7)
 
 The SQLite file at `DATABASE_PATH` (default `data/rcbot.sqlite`) holds all
-state — ticket types, leads, tickets, warnings — so make sure it lives on a
+state — ticket types, leads, tickets — so make sure it lives on a
 persistent volume/directory in whichever option you pick below.
 
 ### Option A: Docker Compose (recommended)
@@ -285,5 +277,5 @@ persistent volume/directory in whichever option you pick below.
 
 Whichever option you use, re-run `npm run deploy-commands` only when the
 slash command *definitions* change (new options, new commands) — day-to-day
-staff/config edits go through `/staff`, `/ticket-config`, and `/mod-config`
-and need no redeploy.
+staff/config edits go through `/staff` and `/ticket-config` and need no
+redeploy.

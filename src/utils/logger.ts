@@ -2,15 +2,12 @@ import { Client, EmbedBuilder, TextChannel } from "discord.js";
 import { getGuildSettings } from "../db/guildSettingsRepo";
 import { Ticket, TicketTypeConfig } from "../types/ticket";
 
-export async function postModLog(
-  client: Client,
-  guildId: string,
-  embed: EmbedBuilder
-): Promise<void> {
+/** Posts an embed to the configured ticket-log channel, if one is set. */
+async function postToLogChannel(client: Client, guildId: string, embed: EmbedBuilder): Promise<void> {
   const settings = getGuildSettings(guildId);
-  if (!settings.modLogChannelId) return;
+  if (!settings.ticketLogChannelId) return;
 
-  const channel = await client.channels.fetch(settings.modLogChannelId).catch(() => null);
+  const channel = await client.channels.fetch(settings.ticketLogChannelId).catch(() => null);
   if (channel instanceof TextChannel) {
     await channel.send({ embeds: [embed] });
   }
@@ -54,5 +51,5 @@ export async function postTicketLog(
   if (details?.outcome) embed.addFields({ name: "Outcome", value: details.outcome, inline: true });
   if (details?.reason) embed.addFields({ name: "Note", value: details.reason.slice(0, 1024) });
 
-  await postModLog(client, ticket.guildId, embed);
+  await postToLogChannel(client, ticket.guildId, embed);
 }

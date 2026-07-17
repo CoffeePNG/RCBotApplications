@@ -7,7 +7,12 @@ import {
   MessageFlags,
 } from "discord.js";
 import { getTicketType, setEnabled, setReviewChannel } from "../../db/ticketConfigRepo";
-import { setArchiveCategory, setArchiveChannel, setTicketCategory } from "../../db/guildSettingsRepo";
+import {
+  setArchiveCategory,
+  setArchiveChannel,
+  setTicketCategory,
+  setTicketLogChannel,
+} from "../../db/guildSettingsRepo";
 import { buildConfigEditModal, ConfigField } from "../../handlers/configHandler";
 import { buildQuestionsPanel } from "../../handlers/questionAdminHandler";
 import { respondTicketTypeAutocomplete } from "../../utils/ticketTypeAutocomplete";
@@ -97,6 +102,18 @@ export const ticketConfigCommand: Command = {
     )
     .addSubcommand((sub) =>
       sub
+        .setName("log-channel")
+        .setDescription("Set the channel that ticket close/reopen/delete events are logged to.")
+        .addChannelOption((opt) =>
+          opt
+            .setName("channel")
+            .setDescription("The ticket-log channel")
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName("enabled")
         .setDescription("Open or close a ticket type (closed types can't be opened and hide from the panel).")
         .addStringOption((opt) =>
@@ -144,6 +161,17 @@ export const ticketConfigCommand: Command = {
       setArchiveChannel(guildId, channel.id);
       await interaction.reply({
         content: `Closed-ticket transcripts will now be archived to <#${channel.id}> for all ticket types.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // `log-channel` (guild-wide): where ticket close/reopen/delete events are logged.
+    if (sub === "log-channel") {
+      const channel = interaction.options.getChannel("channel", true);
+      setTicketLogChannel(guildId, channel.id);
+      await interaction.reply({
+        content: `Ticket close/reopen/delete events will now be logged to <#${channel.id}>.`,
         flags: MessageFlags.Ephemeral,
       });
       return;

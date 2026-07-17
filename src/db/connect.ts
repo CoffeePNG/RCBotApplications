@@ -15,7 +15,7 @@ db.pragma("foreign_keys = ON");
 db.exec(`
   CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id TEXT PRIMARY KEY,
-    mod_log_channel_id TEXT,
+    ticket_log_channel_id TEXT,
     panel_channel_id TEXT,
     panel_message_id TEXT,
     panel_title TEXT,
@@ -62,18 +62,6 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_tickets_guild_type ON tickets (guild_id, type_key);
   CREATE INDEX IF NOT EXISTS idx_tickets_channel ON tickets (channel_id);
-
-  CREATE TABLE IF NOT EXISTS warnings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    guild_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    moderator_id TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    active INTEGER NOT NULL DEFAULT 1
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings (guild_id, user_id);
 
   CREATE TABLE IF NOT EXISTS ticket_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,3 +164,5 @@ ensureColumn("tickets", "archived_at", "INTEGER");
 ensureColumn("tickets", "archive_error", "TEXT");
 // Two-stage close: closed tickets park in an archive category before deletion.
 ensureColumn("guild_settings", "archive_category_id", "TEXT");
+// Ticket lifecycle logging (close/reopen/delete) — was the old mod-log channel.
+ensureColumn("guild_settings", "ticket_log_channel_id", "TEXT");

@@ -72,19 +72,9 @@ export interface Participant {
   active: boolean;
 }
 
-export interface Warning {
-  id: number;
-  guildId: string;
-  userId: string;
-  moderatorId: string;
-  reason: string;
-  createdAt: number;
-  active: boolean;
-}
-
 export interface GuildSettings {
   guildId: string;
-  modLogChannelId: string | null;
+  ticketLogChannelId: string | null;
   panelChannelId: string | null;
   panelMessageId: string | null;
   panelTitle: string | null;

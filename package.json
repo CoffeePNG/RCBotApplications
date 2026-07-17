@@ -1,7 +1,7 @@
 {
   "name": "rcbotapplications",
   "version": "1.0.0",
-  "description": "Config-driven Discord ticket bot (staff applications, bug reports, appeals, help requests) with claim/close/archive and a moderation suite, for Republicraft.",
+  "description": "Config-driven Discord ticket bot (staff applications, bug reports, appeals, help requests) with claim/close/archive and ticket lifecycle logging, for Republicraft.",
   "main": "dist/index.js",
   "type": "commonjs",
   "scripts": {

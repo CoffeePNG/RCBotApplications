@@ -7,7 +7,7 @@ export function getGuildSettings(guildId: string): GuildSettings {
     .get(guildId) as any;
   return {
     guildId,
-    modLogChannelId: row ? row.mod_log_channel_id : null,
+    ticketLogChannelId: row ? row.ticket_log_channel_id : null,
     panelChannelId: row ? row.panel_channel_id : null,
     panelMessageId: row ? row.panel_message_id : null,
     panelTitle: row ? row.panel_title : null,
@@ -42,11 +42,11 @@ export function setArchiveCategory(guildId: string, categoryId: string): void {
   ).run(guildId, categoryId);
 }
 
-export function setModLogChannel(guildId: string, channelId: string): void {
+export function setTicketLogChannel(guildId: string, channelId: string): void {
   db.prepare(
-    `INSERT INTO guild_settings (guild_id, mod_log_channel_id)
+    `INSERT INTO guild_settings (guild_id, ticket_log_channel_id)
      VALUES (?, ?)
-     ON CONFLICT(guild_id) DO UPDATE SET mod_log_channel_id = excluded.mod_log_channel_id`
+     ON CONFLICT(guild_id) DO UPDATE SET ticket_log_channel_id = excluded.ticket_log_channel_id`
   ).run(guildId, channelId);
 }
 

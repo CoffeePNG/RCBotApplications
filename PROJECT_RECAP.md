@@ -1,9 +1,8 @@
 # RCBotApplications — Project Recap
 
 A Discord utility bot for **Republicraft**: a single config-driven **ticket
-system** (staff applications, bug reports, appeals, help requests) plus a
-standard **moderation** command suite. Built on discord.js v14 + TypeScript,
-storing everything in a local SQLite file.
+system** (staff applications, bug reports, appeals, help requests). Built on
+discord.js v14 + TypeScript, storing everything in a local SQLite file.
 
 ---
 
@@ -21,8 +20,8 @@ storing everything in a local SQLite file.
   Ticket channels use per-user overwrites (creator + staff + managers + added
   participants + the bot); `@everyone` is denied View Channel, and overwrites
   are kept in sync live as people are added/removed.
-- **Scoped bot permissions.** Needs Manage Channels, Kick/Ban Members,
-  Moderate Members — **not** Administrator, and not Manage Roles.
+- **Scoped bot permissions.** Needs Manage Channels — **not** Administrator,
+  and not Manage Roles.
 - **Built for handoff.** Day-to-day management (staff, managers, questions,
   channels, messages, panel, open/closed state) is all done through Discord
   slash commands and modals — no terminal access or file editing needed.
@@ -141,20 +140,15 @@ onto each ticket, so editing a type's questions never rewrites old tickets.
   re-run).
 - `/ticket-panel customize` — modal to edit the panel's title/description
   (blank resets to default; live-refreshes a posted panel).
-- `/mod-config log-channel channel:<>` — set the moderation log channel.
+- `/ticket-config log-channel channel:<>` — set the channel ticket lifecycle
+  events are logged to.
 
-### Moderation (gated by real Discord permission bits)
-- `/ban user reason? delete_message_days?` — requires Ban Members.
-- `/kick user reason?` — requires Kick Members.
-- `/timeout user minutes reason?` — requires Moderate Members.
-- `/warn user reason` — persisted in SQLite; requires Moderate Members.
-- `/unwarn warning_id` — clears (soft-deletes) a warning.
-- `/warnings user` — lists a user's active warnings.
+### Ticket logging
 
-Successful mod actions are logged as an embed to the mod-log channel if set.
 Ticket lifecycle events — **close** (with outcome + note), **reopen**, and
-**channel delete** — are logged to the same mod-log channel, so the closing
-feedback survives even after the ticket channel itself is deleted.
+**channel delete** — are logged as an embed to the channel set via
+`/ticket-config log-channel`. Because the log lives in its own channel, the
+closing feedback survives even after the ticket channel itself is deleted.
 
 ---
 
@@ -202,7 +196,7 @@ feedback survives even after the ticket channel itself is deleted.
    `/staff manager-add user:<@manager>` for a global manager
 4. `/ticket-config questions type:<each>` — review/adjust the seeded questions
 5. `/ticket-config category category:<pick a category>`
-6. `/mod-config log-channel channel:<#mod-log>`
+6. `/ticket-config log-channel channel:<#ticket-log>` (optional)
 7. `/ticket-config enabled type:<> open:false` for any types not ready yet
 8. `/ticket-panel post channel:<#create-a-ticket>`
 
