@@ -1,5 +1,5 @@
 import { Client, EmbedBuilder, TextChannel } from "discord.js";
-import { getAnswers } from "../db/answerRepo";
+import { getAnswerPairs } from "../db/answerRepo";
 import { getLeads } from "../db/ticketConfigRepo";
 import { buildTicketButtons, buildTicketEmbed } from "./ticketEmbeds";
 import { formatLeadsMention, resolveTemplate } from "./ticketFormatter";
@@ -12,7 +12,7 @@ export async function rebuildTicketEmbed(
   ticketType: TicketTypeConfig
 ): Promise<EmbedBuilder> {
   const creator = await client.users.fetch(ticket.creatorId).catch(() => null);
-  const answers = getAnswers(ticket.id).map((a) => ({ label: a.questionLabel, answer: a.answer ?? "" }));
+  const answers = getAnswerPairs(ticket.id);
   const openMessage = resolveTemplate(ticketType.openMessage, {
     department: ticketType.department,
     leads: formatLeadsMention(getLeads(ticketType.id)),

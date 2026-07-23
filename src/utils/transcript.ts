@@ -44,36 +44,45 @@ export function sanitizeMentions(text: string): string {
     .replace(/<@&(\d+)>/g, "<@&​$1>");
 }
 
+// Built once and reused for every line — constructing an Intl formatter is the
+// expensive part, and a long transcript renders thousands of dates.
+const HEADER_DATE_FMT = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
+const MESSAGE_DATE_FMT = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
+
+/** Returns a lookup for a formatter's parts so callers can reassemble any layout. */
+function dateParts(fmt: Intl.DateTimeFormat, ms: number): (type: string) => string {
+  const parts = fmt.formatToParts(new Date(ms));
+  return (type) => parts.find((part) => part.type === type)?.value ?? "";
+}
+
 /** "Tuesday, 14 July 2026 at 23:15:44 UTC" — used for the header dates. */
 function formatHeaderDate(ms: number): string {
-  const p = new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).formatToParts(new Date(ms));
-  const get = (type: string) => p.find((part) => part.type === type)?.value ?? "";
+  const get = dateParts(HEADER_DATE_FMT, ms);
   return `${get("weekday")}, ${get("day")} ${get("month")} ${get("year")} at ${get("hour")}:${get("minute")}:${get("second")} UTC`;
 }
 
 /** "14/07/2026, 23:48:31 UTC" — used on each message line. */
 function formatMessageDate(ms: number): string {
-  const p = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).formatToParts(new Date(ms));
-  const get = (type: string) => p.find((part) => part.type === type)?.value ?? "";
+  const get = dateParts(MESSAGE_DATE_FMT, ms);
   return `${get("day")}/${get("month")}/${get("year")}, ${get("hour")}:${get("minute")}:${get("second")} UTC`;
 }
 
@@ -94,16 +103,20 @@ function quote(text: string): string {
     .join("\n");
 }
 
-/** The identity to show for a message's author, preferring the server nickname. */
+/** The name to show for a message's author, preferring the server nickname. */
+function authorDisplay(message: Message): string {
+  return message.member?.displayName ?? message.author.displayName;
+}
+
+/** The full identity (name, tag, id) for a message's author, for the participant list. */
 function authorIdentity(message: Message): TranscriptIdentity {
-  const display = message.member?.displayName ?? message.author.displayName;
-  return { display, tag: message.author.tag, id: message.author.id };
+  return { display: authorDisplay(message), tag: message.author.tag, id: message.author.id };
 }
 
 /** Renders a single message into its numbered transcript line(s). */
 function renderMessage(message: Message, index: number, numberById: Map<string, number>): string {
   const time = formatMessageDate(message.createdTimestamp);
-  const who = authorIdentity(message).display;
+  const who = authorDisplay(message);
 
   if (message.system) {
     return `<${index}> [${time}] * system event (type ${message.type}) — ${who}`;

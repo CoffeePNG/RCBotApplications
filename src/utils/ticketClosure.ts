@@ -1,10 +1,11 @@
 import { AttachmentBuilder, Client, Guild, TextChannel } from "discord.js";
 import { getTicketById, markArchived } from "../db/ticketRepo";
-import { getAnswers } from "../db/answerRepo";
+import { getAnswerPairs } from "../db/answerRepo";
 import { recordAudit } from "../db/auditRepo";
 import { resolveArchiveChannelId } from "./ticketPermissions";
 import { buildTranscriptLogEmbed } from "./ticketEmbeds";
 import {
+  Transcript,
   TranscriptContext,
   TranscriptIdentity,
   buildTranscriptFiles,
@@ -49,13 +50,30 @@ async function buildTranscriptContext(
     closedBy,
     closeReason: ticket.closeReason,
     claimedBy,
-    questions: getAnswers(ticket.id).map((a) => ({ label: a.questionLabel, answer: a.answer ?? "" })),
+    questions: getAnswerPairs(ticket.id),
   };
 }
 
 /**
- * Reads a ticket channel and returns its transcript as `.txt` attachment(s).
- * Shared by the archive post and the DM "Get transcript" button.
+ * Reads a ticket channel and renders its transcript once, returning both the
+ * parsed transcript (participant counts, etc.) and the `.txt` attachment(s).
+ * The single assembly point behind the archive post and the DM button.
+ */
+async function buildTicketTranscript(
+  client: Client,
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  channel: TextChannel
+): Promise<{ transcript: Transcript; files: AttachmentBuilder[] }> {
+  const context = await buildTranscriptContext(client, ticket, ticketType, channel.guild);
+  const transcript = await generateTranscript(channel, context);
+  const baseName = `${ticket.code ?? `ticket-${ticket.id}`}-transcript`;
+  return { transcript, files: buildTranscriptFiles(transcript.text, baseName) };
+}
+
+/**
+ * The transcript `.txt` attachment(s) for a ticket. Used by the DM "Get
+ * transcript" button; the caller passes an already-loaded ticket row.
  */
 export async function generateTicketTranscriptFiles(
   client: Client,
@@ -63,11 +81,7 @@ export async function generateTicketTranscriptFiles(
   ticketType: TicketTypeConfig,
   channel: TextChannel
 ): Promise<AttachmentBuilder[]> {
-  const fresh = getTicketById(ticket.id) ?? ticket;
-  const context = await buildTranscriptContext(client, fresh, ticketType, channel.guild);
-  const transcript = await generateTranscript(channel, context);
-  const baseName = `${fresh.code ?? `ticket-${ticket.id}`}-transcript`;
-  return buildTranscriptFiles(transcript.text, baseName);
+  return (await buildTicketTranscript(client, ticket, ticketType, channel)).files;
 }
 
 export interface ArchiveResult {
@@ -94,8 +108,7 @@ export async function postTranscript(
   const archiveChannelId = resolveArchiveChannelId(ticket.guildId, ticket.typeKey);
 
   try {
-    const context = await buildTranscriptContext(client, fresh, ticketType, channel.guild);
-    const transcript = await generateTranscript(channel, context);
+    const { transcript, files } = await buildTicketTranscript(client, fresh, ticketType, channel);
 
     if (!archiveChannelId) {
       return { ok: false, noTarget: true, error: "No archive channel is configured." };
@@ -114,8 +127,6 @@ export async function postTranscript(
       return { ok: false, error };
     }
 
-    const baseName = `${fresh.code ?? `ticket-${ticket.id}`}-transcript`;
-    const files = buildTranscriptFiles(transcript.text, baseName);
     const posted = await archiveChannel.send({
       embeds: [buildTranscriptLogEmbed(fresh, ticketType, transcript.participants)],
       files,

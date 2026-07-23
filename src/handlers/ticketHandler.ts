@@ -28,7 +28,7 @@ import {
 import { getQuestions } from "../db/questionRepo";
 import { saveAnswers } from "../db/answerRepo";
 import { Ticket, TicketTypeConfig } from "../types/ticket";
-import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
+import { formatLeadsMention, resolveTemplate, ticketReference } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
   buildCloseDmComponents,
@@ -49,7 +49,12 @@ import { TICKET_CAP_MESSAGE, canClaim, canClose, canOpenNewTicket, canUnclaim } 
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
 import { generateTicketTranscriptFiles, postTranscript } from "../utils/ticketClosure";
-import { makeChannelStaffOnly, moveToArchiveCategory, restoreTicketChannel } from "../utils/ticketPermissions";
+import {
+  fetchTicketChannel,
+  makeChannelStaffOnly,
+  moveToArchiveCategory,
+  restoreTicketChannel,
+} from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
 import { postTicketLog } from "../utils/logger";
 import { buildPanelContent } from "../utils/ticketPanel";
@@ -772,10 +777,8 @@ export async function handleDmTranscriptRequest(interaction: ButtonInteraction) 
   // DMs don't support ephemeral replies, so just defer a normal reply.
   await interaction.deferReply();
 
-  const channel = ticket.channelId
-    ? await interaction.client.channels.fetch(ticket.channelId).catch(() => null)
-    : null;
-  if (!(channel instanceof TextChannel)) {
+  const channel = await fetchTicketChannel(interaction.client, ticket);
+  if (!channel) {
     await interaction.editReply({
       content: "This ticket's channel has been deleted, so a transcript can no longer be generated. Please contact staff if you need it.",
     });
@@ -785,7 +788,7 @@ export async function handleDmTranscriptRequest(interaction: ButtonInteraction) 
   try {
     const files = await generateTicketTranscriptFiles(interaction.client, ticket, ticketType, channel);
     await interaction.editReply({
-      content: `Here's the transcript for **${ticket.code ?? `#${ticket.id}`}**:`,
+      content: `Here's the transcript for **${ticketReference(ticket)}**:`,
       files,
     });
   } catch {

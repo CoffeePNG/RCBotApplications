@@ -39,3 +39,8 @@ export function getAnswers(ticketId: number): TicketAnswer[] {
     .all(ticketId) as any[];
   return rows.map(rowToAnswer);
 }
+
+/** A ticket's answers as `{ label, answer }` pairs (empty string for unanswered), in question order. */
+export function getAnswerPairs(ticketId: number): { label: string; answer: string }[] {
+  return getAnswers(ticketId).map((a) => ({ label: a.questionLabel, answer: a.answer ?? "" }));
+}

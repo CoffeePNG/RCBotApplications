@@ -21,10 +21,44 @@ import {
 import { CLOSE_OUTCOMES } from "./closeOutcomes";
 import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
+import { ticketReference } from "./ticketFormatter";
 import { ParticipantCount } from "./transcript";
 
 /** Soft pink brand hue used for the close DM (Discord embeds are a single solid color — no gradients). */
 export const BRAND_PINK = 0xf7a8c4;
+
+/** Presentation for each ticket lifecycle event shown in the log channel. */
+const TICKET_EVENT_META = {
+  closed: { title: "Ticket Closed", actorLabel: "Closed by", color: 0x99aab5 },
+  reopened: { title: "Ticket Reopened", actorLabel: "Reopened by", color: 0x57f287 },
+  deleted: { title: "Ticket Channel Deleted", actorLabel: "Deleted by", color: 0xed4245 },
+} as const;
+
+export type TicketLifecycleEvent = keyof typeof TICKET_EVENT_META;
+
+/** The embed logged to the ticket-log channel for a close / reopen / delete event. */
+export function buildTicketLogEmbed(
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  event: TicketLifecycleEvent,
+  actorId: string,
+  details?: { outcome?: string | null; reason?: string | null }
+): EmbedBuilder {
+  const meta = TICKET_EVENT_META[event];
+  const embed = new EmbedBuilder()
+    .setTitle(meta.title)
+    .setColor(meta.color)
+    .addFields(
+      { name: "Ticket", value: `${ticketType.displayName} — ${ticketReference(ticket)}`, inline: true },
+      { name: meta.actorLabel, value: `<@${actorId}>`, inline: true },
+      { name: "Opened by", value: `<@${ticket.creatorId}>`, inline: true }
+    )
+    .setTimestamp();
+
+  if (details?.outcome) embed.addFields({ name: "Outcome", value: details.outcome, inline: true });
+  if (details?.reason) embed.addFields({ name: "Note", value: details.reason.slice(0, 1024) });
+  return embed;
+}
 
 function statusColor(status: Ticket["status"]): number {
   if (status === "claimed") return 0xfee75c;
@@ -37,7 +71,7 @@ function statusColor(status: Ticket["status"]): number {
  * entirely when no note was left.
  */
 export function buildCloseDmEmbed(ticket: Ticket, closerId: string, reason: string | null): EmbedBuilder {
-  const reference = ticket.code ?? `#${ticket.id}`;
+  const reference = ticketReference(ticket);
   return new EmbedBuilder()
     .setColor(BRAND_PINK)
     .setTitle("Ticket Closed")

@@ -15,7 +15,7 @@ const VIEWER_ALLOW = {
   EmbedLinks: true,
 } as const;
 
-async function fetchTicketChannel(client: Client, ticket: Ticket): Promise<TextChannel | null> {
+export async function fetchTicketChannel(client: Client, ticket: Ticket): Promise<TextChannel | null> {
   if (!ticket.channelId) return null;
   const channel = await client.channels.fetch(ticket.channelId).catch(() => null);
   return channel instanceof TextChannel ? channel : null;

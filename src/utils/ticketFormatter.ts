@@ -1,3 +1,10 @@
+import { Ticket } from "../types/ticket";
+
+/** The human reference for a ticket: its code, or `#<id>` when it has none. */
+export function ticketReference(ticket: Ticket): string {
+  return ticket.code ?? `#${ticket.id}`;
+}
+
 /** Replaces `{key}` placeholders in a template with values from `vars`; unknown keys are left as-is. */
 export function resolveTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, key) =>
