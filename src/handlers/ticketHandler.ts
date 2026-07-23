@@ -31,6 +31,7 @@ import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
+  buildCloseDmEmbed,
   buildDeleteConfirmRow,
   buildOutcomeButtons,
   buildTicketButtons,
@@ -534,6 +535,14 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
   // lock it down later with "Make Staff Only".
   await moveToArchiveCategory(channel, closed);
   await updateTicketMessage(interaction.client, closed, ticketType);
+
+  // Let the creator know their ticket was closed (best-effort — DMs may be off).
+  const creator = await interaction.client.users.fetch(closed.creatorId).catch(() => null);
+  if (creator) {
+    await creator
+      .send({ embeds: [buildCloseDmEmbed(closed, interaction.user.id, reason)] })
+      .catch(() => null);
+  }
 
   await channel
     .send(

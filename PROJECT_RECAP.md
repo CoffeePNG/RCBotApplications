@@ -46,7 +46,8 @@ discord.js v14 + TypeScript, storing everything in a local SQLite file.
    Denied / No Response / Other) → picking one pops a small
    optional-reason note. The channel is **moved to the archive category** but
    everyone keeps access. The buttons become **Reopen / Make Staff Only /
-   Delete Channel**.
+   Delete Channel**. The creator is **DM'd** a soft-pink embed telling them who
+   closed it and the reason (reason line omitted when none was given).
 4. **Reopen / Make Staff Only / Delete** — all staff only. *Reopen* reverts to
    active, moves the channel back to the ticket category, and restores
    creator/participant access. *Make Staff Only* removes the creator/participants

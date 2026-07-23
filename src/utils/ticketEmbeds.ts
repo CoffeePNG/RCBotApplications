@@ -22,10 +22,29 @@ import { Ticket } from "../types/ticket";
 import { TicketTypeConfig } from "../types/ticket";
 import { ParticipantCount } from "./transcript";
 
+/** Soft pink brand hue used for the close DM (Discord embeds are a single solid color — no gradients). */
+export const BRAND_PINK = 0xf7a8c4;
+
 function statusColor(status: Ticket["status"]): number {
   if (status === "claimed") return 0xfee75c;
   if (status === "closed") return 0x99aab5;
   return 0x5865f2;
+}
+
+/**
+ * The embed DM'd to a ticket's creator when it's closed. Omits the reason line
+ * entirely when no note was left.
+ */
+export function buildCloseDmEmbed(ticket: Ticket, closerId: string, reason: string | null): EmbedBuilder {
+  const reference = ticket.code ?? `#${ticket.id}`;
+  return new EmbedBuilder()
+    .setColor(BRAND_PINK)
+    .setTitle("Ticket Closed")
+    .setDescription(
+      `Your ticket **${reference}** has been closed by <@${closerId}>.` +
+        (reason ? `\n\n**Reason:** ${reason}` : "")
+    )
+    .setTimestamp();
 }
 
 /** Sets an embed's color and adds Claimed/Closed fields to match a ticket's current status. */
