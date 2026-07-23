@@ -1,10 +1,57 @@
-import { Client, TextChannel } from "discord.js";
+import { Client, Guild, TextChannel } from "discord.js";
 import { getTicketById, markArchived } from "../db/ticketRepo";
+import { getAnswers } from "../db/answerRepo";
 import { recordAudit } from "../db/auditRepo";
 import { resolveArchiveChannelId } from "./ticketPermissions";
 import { buildTranscriptLogEmbed } from "./ticketEmbeds";
-import { buildTranscriptFiles, generateTranscript } from "./transcript";
+import {
+  TranscriptContext,
+  TranscriptIdentity,
+  buildTranscriptFiles,
+  generateTranscript,
+} from "./transcript";
 import { Ticket, TicketTypeConfig } from "../types/ticket";
+
+/** Resolves a user id to a transcript identity, preferring their server nickname. */
+async function resolveIdentity(
+  client: Client,
+  guild: Guild,
+  userId: string | null
+): Promise<TranscriptIdentity | null> {
+  if (!userId) return null;
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (member) return { display: member.displayName, tag: member.user.tag, id: userId };
+  const user = await client.users.fetch(userId).catch(() => null);
+  if (user) return { display: user.displayName, tag: user.tag, id: userId };
+  return { display: "unknown", tag: userId, id: userId };
+}
+
+/** Assembles the header/questions context a transcript needs from a ticket. */
+async function buildTranscriptContext(
+  client: Client,
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  guild: Guild
+): Promise<TranscriptContext> {
+  const [createdBy, claimedBy, closedBy] = await Promise.all([
+    resolveIdentity(client, guild, ticket.creatorId),
+    resolveIdentity(client, guild, ticket.claimedBy),
+    resolveIdentity(client, guild, ticket.closedBy),
+  ]);
+  return {
+    guildId: guild.id,
+    guildName: guild.name,
+    typeName: ticketType.displayName,
+    number: ticket.id,
+    createdAt: ticket.createdAt,
+    createdBy,
+    closedAt: ticket.closedAt,
+    closedBy,
+    closeReason: ticket.closeReason,
+    claimedBy,
+    questions: getAnswers(ticket.id).map((a) => ({ label: a.questionLabel, answer: a.answer ?? "" })),
+  };
+}
 
 export interface ArchiveResult {
   ok: boolean;
@@ -30,7 +77,8 @@ export async function postTranscript(
   const archiveChannelId = resolveArchiveChannelId(ticket.guildId, ticket.typeKey);
 
   try {
-    const transcript = await generateTranscript(channel);
+    const context = await buildTranscriptContext(client, fresh, ticketType, channel.guild);
+    const transcript = await generateTranscript(channel, context);
 
     if (!archiveChannelId) {
       return { ok: false, noTarget: true, error: "No archive channel is configured." };

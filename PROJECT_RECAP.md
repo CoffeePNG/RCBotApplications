@@ -71,9 +71,12 @@ channel:
 1. A **summary embed** — ticket code, opened/claimed/closed by, **outcome**,
    optional **reason**, duration, and a **per-person message count**.
 2. The full **transcript** as a `.txt` attachment (split across files if it
-   exceeds Discord's upload limit), never a code block. Each line carries author
-   tag+id, message id, reply refs, edit timestamps, pins, attachments, embed
-   counts, and system events.
+   exceeds Discord's upload limit), never a code block. It opens with a metadata
+   header (guild, ticket number, topic, created/closed on + by, close reason,
+   claimant, participant list, pinned messages), then the original
+   **questions/answers**, then a numbered message log — each line
+   `<n> [DD/MM/YYYY, HH:MM:SS UTC] Name: text` with reply refs, edit markers,
+   attachments, embed counts, and system events preserved.
 
 Closed channels are first parked in the **archive category**
 (`/ticket-config archive-category`), staff-only, until deleted. Transcripts

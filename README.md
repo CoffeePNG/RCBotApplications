@@ -171,9 +171,12 @@ summary embed — titled `<Ticket Type> — <code>`, with Opened/Claimed/Closed-
 **outcome**, optional **reason**, duration, and a per-person message count (not
 the message bodies) — plus the full transcript as a `.txt` file (or several,
 split on line boundaries if it would exceed Discord's upload limit), never a
-code block. Each message line carries author tag + id, message id, reply
-references, edit timestamps, pins, attachment names/urls, embed counts, and
-system events. The channel is only deleted **after** the archive post is
+code block. The transcript opens with a metadata header (guild, ticket number,
+topic, created/closed on + by, close reason, claimant, participant list, pinned
+messages), then the original questions/answers, then a numbered message log —
+each line `<n> [DD/MM/YYYY, HH:MM:SS UTC] Name: text` with reply references, edit
+markers, attachment names/urls, embed counts, and system events preserved. The
+channel is only deleted **after** the archive post is
 confirmed, so a transcript is never lost to a failed delete — a failure keeps
 the channel so you can Delete again.
 
