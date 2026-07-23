@@ -12,3 +12,4 @@ export const TICKET_STAFFONLY_PREFIX = "ticket_staffonly:";
 export const TICKET_DELETE_PREFIX = "ticket_delete:";
 export const TICKET_DELETE_CONFIRM_PREFIX = "ticket_delete_confirm:";
 export const TICKET_DELETE_CANCEL_PREFIX = "ticket_delete_cancel:";
+export const TICKET_DM_TRANSCRIPT_PREFIX = "ticket_dm_transcript:";

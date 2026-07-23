@@ -14,6 +14,7 @@ import {
   TICKET_DELETE_CANCEL_PREFIX,
   TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_DM_TRANSCRIPT_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_PANEL_SELECT_ID,
   TICKET_REOPEN_PREFIX,
@@ -22,6 +23,7 @@ import {
   TICKET_UNCLAIM_PREFIX,
 } from "../handlers/ticketConstants";
 import {
+  handleDmTranscriptRequest,
   handleTicketClaim,
   handleTicketCloseModalSubmit,
   handleTicketCloseRequest,
@@ -128,6 +130,8 @@ export async function handleInteraction(
         await handleTicketDeleteCancel(interaction);
       } else if (interaction.customId.startsWith(TICKET_DELETE_PREFIX)) {
         await handleTicketDelete(interaction);
+      } else if (interaction.customId.startsWith(TICKET_DM_TRANSCRIPT_PREFIX)) {
+        await handleDmTranscriptRequest(interaction);
       } else if (QUESTION_BUTTON_PREFIXES.some((p) => interaction.customId.startsWith(p))) {
         await handleQuestionButton(interaction);
       }

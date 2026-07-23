@@ -11,6 +11,7 @@ import {
   TICKET_DELETE_CANCEL_PREFIX,
   TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_DM_TRANSCRIPT_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_REOPEN_PREFIX,
   TICKET_STAFFONLY_PREFIX,
@@ -45,6 +46,17 @@ export function buildCloseDmEmbed(ticket: Ticket, closerId: string, reason: stri
         (reason ? `\n\n**Reason:** ${reason}` : "")
     )
     .setTimestamp();
+}
+
+/** The "Get transcript" button attached to the close DM. */
+export function buildCloseDmComponents(ticketId: number): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${TICKET_DM_TRANSCRIPT_PREFIX}${ticketId}`)
+      .setLabel("Get transcript")
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("📄")
+  );
 }
 
 /** Sets an embed's color and adds Claimed/Closed fields to match a ticket's current status. */

@@ -1,4 +1,4 @@
-import { Client, Guild, TextChannel } from "discord.js";
+import { AttachmentBuilder, Client, Guild, TextChannel } from "discord.js";
 import { getTicketById, markArchived } from "../db/ticketRepo";
 import { getAnswers } from "../db/answerRepo";
 import { recordAudit } from "../db/auditRepo";
@@ -51,6 +51,23 @@ async function buildTranscriptContext(
     claimedBy,
     questions: getAnswers(ticket.id).map((a) => ({ label: a.questionLabel, answer: a.answer ?? "" })),
   };
+}
+
+/**
+ * Reads a ticket channel and returns its transcript as `.txt` attachment(s).
+ * Shared by the archive post and the DM "Get transcript" button.
+ */
+export async function generateTicketTranscriptFiles(
+  client: Client,
+  ticket: Ticket,
+  ticketType: TicketTypeConfig,
+  channel: TextChannel
+): Promise<AttachmentBuilder[]> {
+  const fresh = getTicketById(ticket.id) ?? ticket;
+  const context = await buildTranscriptContext(client, fresh, ticketType, channel.guild);
+  const transcript = await generateTranscript(channel, context);
+  const baseName = `${fresh.code ?? `ticket-${ticket.id}`}-transcript`;
+  return buildTranscriptFiles(transcript.text, baseName);
 }
 
 export interface ArchiveResult {

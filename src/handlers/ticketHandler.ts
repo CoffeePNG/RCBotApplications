@@ -31,6 +31,7 @@ import { Ticket, TicketTypeConfig } from "../types/ticket";
 import { formatLeadsMention, resolveTemplate } from "../utils/ticketFormatter";
 import {
   applyTicketStatus,
+  buildCloseDmComponents,
   buildCloseDmEmbed,
   buildDeleteConfirmRow,
   buildOutcomeButtons,
@@ -47,7 +48,7 @@ import { outcomeByIndex } from "../utils/closeOutcomes";
 import { TICKET_CAP_MESSAGE, canClaim, canClose, canOpenNewTicket, canUnclaim } from "../utils/ticketAuth";
 import { recordAudit, recordClaimHistory } from "../db/auditRepo";
 import { applyClaimChange } from "../utils/claimActions";
-import { postTranscript } from "../utils/ticketClosure";
+import { generateTicketTranscriptFiles, postTranscript } from "../utils/ticketClosure";
 import { makeChannelStaffOnly, moveToArchiveCategory, restoreTicketChannel } from "../utils/ticketPermissions";
 import { updateTicketMessage } from "../utils/ticketMessage";
 import { postTicketLog } from "../utils/logger";
@@ -59,6 +60,7 @@ import {
   TICKET_CREATE_MODAL_PREFIX,
   TICKET_DELETE_CONFIRM_PREFIX,
   TICKET_DELETE_PREFIX,
+  TICKET_DM_TRANSCRIPT_PREFIX,
   TICKET_OUTCOME_PREFIX,
   TICKET_REOPEN_PREFIX,
   TICKET_STAFFONLY_PREFIX,
@@ -536,19 +538,22 @@ export async function handleTicketCloseModalSubmit(interaction: ModalSubmitInter
   await moveToArchiveCategory(channel, closed);
   await updateTicketMessage(interaction.client, closed, ticketType);
 
-  // Let the creator know their ticket was closed (best-effort — DMs may be off).
+  // Let the creator know their ticket was closed (best-effort — DMs may be off),
+  // with a button they can use to pull the transcript on request.
   const creator = await interaction.client.users.fetch(closed.creatorId).catch(() => null);
   if (creator) {
     await creator
-      .send({ embeds: [buildCloseDmEmbed(closed, interaction.user.id, reason)] })
+      .send({
+        embeds: [buildCloseDmEmbed(closed, interaction.user.id, reason)],
+        components: [buildCloseDmComponents(closed.id)],
+      })
       .catch(() => null);
   }
 
   await channel
     .send(
       `This ticket has been closed by <@${interaction.user.id}>${outcome ? ` — **${outcome}**` : ""}.` +
-        (reason ? `\n**Note:** ${reason}` : "") +
-        "\nStaff can **Reopen** it, **Make Staff Only** to hide it from non-staff, or **Delete Channel** to remove it."
+        (reason ? `\n**Note:** ${reason}` : "")
     )
     .catch(() => null);
 
@@ -740,6 +745,54 @@ export async function handleTranscriptCommand(interaction: ChatInputCommandInter
         ? "No archive channel is configured. Set one with `/ticket-config archive-channel` first."
         : `Couldn't post the transcript: ${archive.error ?? "unknown error"}.`,
   });
+}
+
+/**
+ * "Get transcript" button on the close DM: sends the ticket creator the
+ * transcript on request. Only the ticket's owner can use it, and only while the
+ * channel still exists (a deleted channel can't be re-read).
+ */
+export async function handleDmTranscriptRequest(interaction: ButtonInteraction) {
+  const ticketId = Number(interaction.customId.slice(TICKET_DM_TRANSCRIPT_PREFIX.length));
+  const found = resolveTicketAndType(ticketId);
+  if (!found) {
+    await interaction.reply({ content: "That ticket no longer exists.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const { ticket, ticketType } = found;
+
+  if (interaction.user.id !== ticket.creatorId) {
+    await interaction.reply({
+      content: "Only the person who opened this ticket can request its transcript.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // DMs don't support ephemeral replies, so just defer a normal reply.
+  await interaction.deferReply();
+
+  const channel = ticket.channelId
+    ? await interaction.client.channels.fetch(ticket.channelId).catch(() => null)
+    : null;
+  if (!(channel instanceof TextChannel)) {
+    await interaction.editReply({
+      content: "This ticket's channel has been deleted, so a transcript can no longer be generated. Please contact staff if you need it.",
+    });
+    return;
+  }
+
+  try {
+    const files = await generateTicketTranscriptFiles(interaction.client, ticket, ticketType, channel);
+    await interaction.editReply({
+      content: `Here's the transcript for **${ticket.code ?? `#${ticket.id}`}**:`,
+      files,
+    });
+  } catch {
+    await interaction.editReply({
+      content: "Couldn't generate the transcript right now. Please contact staff.",
+    });
+  }
 }
 
 function safeField(interaction: ModalSubmitInteraction, fieldId: string): string {
